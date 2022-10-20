@@ -151,13 +151,13 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ServerConfig, io.Write
 	if config.LogPath == "-" || len(config.LogPath) == 0 {
 		log.SetOutput(os.Stderr)
 	} else {
-		logWriter = getLogWriter(config.LogPath)
+		logWriter, logFilePath := getLogWriterForParentProcess(config.LogPath)
 
 		// use multi output - to output to file and stdout
 		mw := io.MultiWriter(os.Stderr, logWriter)
 		log.SetOutput(mw)
 
-		logger.Infof("Logging to %s", config.LogPath)
+		logger.Infof("Logging to %s", logFilePath)
 	}
 
 	return config, logWriter, true, nil // contiue
@@ -177,12 +177,24 @@ func PrintHelp(command *cobra.Command) error {
 	return command.Usage()
 }
 
-func getLogWriter(logPath string) io.WriteCloser {
+func getLogWriterForParentProcess(logPath string) (io.WriteCloser, string) {
+	logFilePath := fmt.Sprintf("%s.parent", logPath)
 	return &lumberjack.Logger{
-		Filename:   logPath,
+		Filename:   logFilePath,
 		MaxSize:    50, // 50MB
 		MaxBackups: 5,
 		MaxAge:     30, // 30 days
 		Compress:   false,
-	}
+	}, logFilePath
+}
+
+func getLogWriterForChildProcess(logPath string) (io.WriteCloser, string) {
+	logFilePath := fmt.Sprintf("%s.child", logPath)
+	return &lumberjack.Logger{
+		Filename:   logFilePath,
+		MaxSize:    50, // 50MB
+		MaxBackups: 5,
+		MaxAge:     30, // 30 days
+		Compress:   false,
+	}, logFilePath
 }

@@ -179,10 +179,10 @@ func ChildProcessReadConfigViaSTDIN() (*commons.ServerConfig, io.WriteCloser, er
 	// output to log file
 	var logWriter io.WriteCloser
 	if len(config.LogPath) > 0 {
-		logWriter = getLogWriter(config.LogPath)
+		logWriter, logFilePath := getLogWriterForChildProcess(config.LogPath)
 		log.SetOutput(logWriter)
 
-		logger.Infof("Logging to %s", config.LogPath)
+		logger.Infof("Logging to %s", logFilePath)
 	}
 
 	return config, logWriter, nil
