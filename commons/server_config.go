@@ -11,6 +11,8 @@ const (
 	LogFilePathDefault string = "/tmp/irods_rule_async_exec_cmd.log"
 
 	NatsClientIDPrefixDefault string = "irods_rule_async_exec_cmd_"
+	IrodsPortDefault          int    = 1247
+	IrodsMountPathDefault     string = "/"
 )
 
 // NatsConfig is a configuration struct for NATS/STAN Message bus
@@ -27,7 +29,19 @@ type AmqpConfig struct {
 }
 
 type BisqueConfig struct {
-	URL string `yaml:"url"`
+	URL            string `yaml:"url"`
+	AdminUsername  string `yaml:"admin_username"`
+	AdminPassword  string `yaml:"admin_password"`
+	IrodsBaseURL   string `yaml:"irods_base_url"`   // include http:// or file://
+	IrodsMountPath string `yaml:"irods_mount_path"` // e.g., '/' datastore, '/iplant/home' for ucsb
+}
+
+type IrodsConfig struct {
+	Host          string `yaml:"host"`
+	Port          int    `yaml:"port"`
+	AdminUsername string `yaml:"admin_username"`
+	AdminPassword string `yaml:"admin_password"`
+	Zone          string `yaml:"zone"`
 }
 
 // ServerConfig is a configuration struct for server
@@ -40,6 +54,9 @@ type ServerConfig struct {
 
 	// Bisque
 	BisqueConfig BisqueConfig `yaml:"bisque_config,omitempty"`
+
+	// iRODS
+	IrodsConfig IrodsConfig `yaml:"irods_config,omitempty"`
 
 	// for Logging
 	LogPath string `yaml:"log_path,omitempty"`
@@ -65,7 +82,17 @@ func NewDefaultServerConfig() *ServerConfig {
 		},
 
 		BisqueConfig: BisqueConfig{
-			URL: "",
+			URL:            "",
+			AdminUsername:  "",
+			AdminPassword:  "",
+			IrodsMountPath: IrodsMountPathDefault,
+		},
+
+		IrodsConfig: IrodsConfig{
+			Host:          "",
+			Port:          IrodsPortDefault,
+			AdminUsername: "",
+			AdminPassword: "",
 		},
 
 		LogPath: LogFilePathDefault,
@@ -116,6 +143,38 @@ func (config *ServerConfig) Validate() error {
 
 	if len(config.BisqueConfig.URL) == 0 {
 		return errors.New("BisQue URL is not given")
+	}
+
+	if len(config.BisqueConfig.AdminUsername) == 0 {
+		return errors.New("BisQue Admin Username is not given")
+	}
+
+	if len(config.BisqueConfig.AdminPassword) == 0 {
+		return errors.New("BisQue Admin Password is not given")
+	}
+
+	if len(config.BisqueConfig.IrodsBaseURL) == 0 {
+		return errors.New("BisQue iRODS Base URL is not given")
+	}
+
+	if len(config.BisqueConfig.IrodsMountPath) == 0 {
+		return errors.New("BisQue iRODS Mount Path is not given")
+	}
+
+	if len(config.IrodsConfig.Host) == 0 {
+		return errors.New("IRODS Host is not given")
+	}
+
+	if config.IrodsConfig.Port <= 0 {
+		return errors.New("IRODS Port is not given")
+	}
+
+	if len(config.IrodsConfig.AdminUsername) == 0 {
+		return errors.New("IRODS Admin Username is not given")
+	}
+
+	if len(config.IrodsConfig.AdminPassword) == 0 {
+		return errors.New("IRODS Admin Password is not given")
 	}
 
 	return nil

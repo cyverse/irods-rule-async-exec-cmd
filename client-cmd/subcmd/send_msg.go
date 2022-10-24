@@ -1,7 +1,6 @@
 package subcmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -64,11 +63,6 @@ func processSendMsgCommand(command *cobra.Command, args []string) error {
 	return nil
 }
 
-type sendMessageRequest struct {
-	Key  string `json:"key"`
-	Body string `json:"body"`
-}
-
 func dropSendMessageRequestOne(config *commons.ClientConfig, key string, body string) error {
 	logger := log.WithFields(log.Fields{
 		"package":  "subcmd",
@@ -77,20 +71,11 @@ func dropSendMessageRequestOne(config *commons.ClientConfig, key string, body st
 
 	di := dropin.NewDropIn(config.DropInDirPath)
 
-	request := sendMessageRequest{
-		Key:  key,
-		Body: body,
-	}
-
-	requestBytes, err := json.Marshal(request)
-	if err != nil {
-		logger.Error(err)
-		return err
-	}
-
 	logger.Debugf("drop a send message request %s", key)
 
-	err = di.Drop(requestBytes)
+	request := dropin.NewSendMessageRequest(key, body)
+
+	err := di.Drop(request)
 	if err != nil {
 		logger.Error(err)
 		return err

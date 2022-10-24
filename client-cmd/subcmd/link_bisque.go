@@ -1,7 +1,6 @@
 package subcmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -64,11 +63,6 @@ func processLinkBisqueCommand(command *cobra.Command, args []string) error {
 	return nil
 }
 
-type linkBisqueRequest struct {
-	IRODSUsername string `json:"irods_username"`
-	IRODSPath     string `json:"irods_path"`
-}
-
 func dropLinkBisqueRequestOne(config *commons.ClientConfig, irodsUsername string, irodsPath string) error {
 	logger := log.WithFields(log.Fields{
 		"package":  "subcmd",
@@ -77,20 +71,11 @@ func dropLinkBisqueRequestOne(config *commons.ClientConfig, irodsUsername string
 
 	di := dropin.NewDropIn(config.DropInDirPath)
 
-	request := linkBisqueRequest{
-		IRODSUsername: irodsUsername,
-		IRODSPath:     irodsPath,
-	}
-
-	requestBytes, err := json.Marshal(request)
-	if err != nil {
-		logger.Error(err)
-		return err
-	}
-
 	logger.Debugf("drop a link bisque request %s, %s", irodsUsername, irodsPath)
 
-	err = di.Drop(requestBytes)
+	request := dropin.NewLinkBisqueRequest(irodsUsername, irodsPath)
+
+	err := di.Drop(request)
 	if err != nil {
 		logger.Error(err)
 		return err

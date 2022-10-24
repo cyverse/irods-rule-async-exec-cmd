@@ -50,10 +50,32 @@ func (dropin *DropIn) MakeDropInDir() error {
 }
 
 // Drop drops a request in
-func (dropin *DropIn) Drop(data []byte) error {
+func (dropin *DropIn) Drop(item DropInItem) error {
 	// save as a file
 	id := strconv.FormatInt(time.Now().UnixMicro(), 10)
 	dropInFilePath := filepath.Join(dropin.Dir, id)
 
-	return ioutil.WriteFile(dropInFilePath, data, 0o666)
+	return item.SaveToFile(dropInFilePath)
+}
+
+// Scrape finds all drop-ins
+func (dropin *DropIn) Scrape() ([]DropInItem, error) {
+	files, err := ioutil.ReadDir(dropin.Dir)
+	if err != nil {
+		return nil, err
+	}
+
+	items := []DropInItem{}
+	for _, file := range files {
+		fullpath := filepath.Join(dropin.Dir, file.Name())
+		item, reqErr := NewDropInRequestFromFile(fullpath)
+		if reqErr != nil {
+			err = reqErr
+			continue
+		}
+
+		items = append(items, item)
+	}
+
+	return items, err
 }
