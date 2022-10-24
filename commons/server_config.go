@@ -39,9 +39,9 @@ type BisqueConfig struct {
 type IrodsConfig struct {
 	Host          string `yaml:"host"`
 	Port          int    `yaml:"port"`
+	Zone          string `yaml:"zone"`
 	AdminUsername string `yaml:"admin_username"`
 	AdminPassword string `yaml:"admin_password"`
-	Zone          string `yaml:"zone"`
 }
 
 // ServerConfig is a configuration struct for server
@@ -91,6 +91,7 @@ func NewDefaultServerConfig() *ServerConfig {
 		IrodsConfig: IrodsConfig{
 			Host:          "",
 			Port:          IrodsPortDefault,
+			Zone:          "",
 			AdminUsername: "",
 			AdminPassword: "",
 		},
@@ -163,6 +164,10 @@ func (config *ServerConfig) Validate() error {
 
 	if len(config.IrodsConfig.Host) == 0 {
 		return errors.New("IRODS Host is not given")
+	}
+
+	if len(config.IrodsConfig.Zone) == 0 {
+		return errors.New("IRODS Zone is not given")
 	}
 
 	if config.IrodsConfig.Port <= 0 {

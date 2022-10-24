@@ -43,6 +43,18 @@ func CreateBisque(service *AsyncExecCmdService, config *commons.BisqueConfig) (*
 
 // Release releases all resources
 func (bisque *BisQue) Release() {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "Release",
+	})
+
+	logger.Debug("trying to release HTTP client")
+
+	if bisque.client != nil {
+		bisque.client.CloseIdleConnections()
+		bisque.client = nil
+	}
 }
 
 // ProcessItem processes a drop-in link_bisque request, sending a HTTP request

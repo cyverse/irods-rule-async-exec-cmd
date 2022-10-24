@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/antchfx/xmlquery v1.3.12
+	github.com/cyverse/go-irodsclient v0.9.8
 	github.com/nats-io/stan.go v0.10.3
 	github.com/rs/xid v1.4.0
 	github.com/sirupsen/logrus v1.9.0
@@ -26,6 +27,7 @@ require (
 	github.com/nats-io/nats.go v1.17.0 // indirect
 	github.com/nats-io/nkeys v0.3.0 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
+	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/stretchr/testify v1.7.1 // indirect
 	golang.org/x/crypto v0.0.0-20221010152910-d6f0a8c073c2 // indirect
@@ -33,5 +35,4 @@ require (
 	golang.org/x/sys v0.0.0-20221010170243-090e33056c14 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
-	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 )
