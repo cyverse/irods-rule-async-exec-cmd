@@ -8,6 +8,8 @@ import (
 )
 
 const (
+	ConfigFilePathDefault string = "/etc/irods_rule_async_exec_cmd/config.yml"
+
 	LogFilePathDefault string = "/tmp/irods_rule_async_exec_cmd.log"
 
 	NatsClientIDPrefixDefault string = "irods_rule_async_exec_cmd_"

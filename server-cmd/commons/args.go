@@ -19,7 +19,7 @@ const (
 )
 
 func SetCommonFlags(command *cobra.Command) {
-	command.Flags().StringP("config", "c", "", "Set config file (yaml)")
+	command.Flags().StringP("config", "c", commons.ConfigFilePathDefault, "Set config file (yaml)")
 	command.Flags().BoolP("version", "v", false, "Print version")
 	command.Flags().BoolP("help", "h", false, "Print help")
 	command.Flags().BoolP("debug", "d", false, "Enable debug mode")
@@ -122,6 +122,24 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ServerConfig, io.Write
 	}
 
 	// default config
+	if !readConfig {
+		yamlBytes, err := ioutil.ReadFile(commons.ConfigFilePathDefault)
+		if err != nil {
+			logger.Error(err)
+			return nil, nil, false, err // stop here
+		}
+
+		serverConfig, err := commons.NewServerConfigFromYAML(yamlBytes)
+		if err != nil {
+			logger.Error(err)
+			return nil, nil, false, err // stop here
+		}
+
+		// overwrite config
+		config = serverConfig
+		readConfig = true
+	}
+
 	if !readConfig {
 		config = commons.NewDefaultServerConfig()
 	}
