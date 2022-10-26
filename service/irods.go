@@ -27,7 +27,7 @@ func CreateIrods(service *AsyncExecCmdService, config *commons.IrodsConfig) (*IR
 		"function": "CreateIrods",
 	})
 
-	logger.Debugf("connecting to iRODS host %s:%d, zone %s, user %s", config.Host, config.Port, config.Zone, config.AdminUsername)
+	logger.Infof("connecting to iRODS host %s:%d, zone %s, user %s", config.Host, config.Port, config.Zone, config.AdminUsername)
 
 	account, err := irods_types.CreateIRODSAccount(config.Host, config.Port, config.AdminUsername, config.Zone, irods_types.AuthSchemeNative, config.AdminPassword, "")
 	if err != nil {
@@ -56,7 +56,7 @@ func (irods *IRODS) Release() {
 		"function": "Release",
 	})
 
-	logger.Debugf("trying to release the iRODS FileSystem Client for %s:%d", irods.config.Host, irods.config.Port)
+	logger.Infof("trying to release the iRODS FileSystem Client for %s:%d", irods.config.Host, irods.config.Port)
 
 	if irods.fsClient != nil {
 		irods.fsClient.Release()
@@ -92,6 +92,6 @@ func (irods *IRODS) SetKeyVal(irodsPath string, key string, val string) error {
 		return err
 	}
 
-	logger.Debugf("set a key/val to an iRODS collection/data-object %s, key: %s", irodsPath, key)
+	logger.Infof("set a key/val to an iRODS collection/data-object %s, key: %s", irodsPath, key)
 	return nil
 }

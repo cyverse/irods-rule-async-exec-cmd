@@ -49,7 +49,7 @@ func (bisque *BisQue) Release() {
 		"function": "Release",
 	})
 
-	logger.Debug("trying to release HTTP client")
+	logger.Infof("trying to release HTTP client")
 
 	if bisque.client != nil {
 		bisque.client.CloseIdleConnections()
@@ -94,7 +94,7 @@ func (bisque *BisQue) ProcessItem(request *dropin.LinkBisqueRequest) error {
 		return err
 	}
 
-	logger.Debugf("published a HTTP request for linking an iRODS object %s", request.IRODSPath)
+	logger.Infof("published a HTTP request for linking an iRODS object %s to %s", request.IRODSPath, irodsPathFromBisque)
 
 	// process response xml
 	resp = strings.TrimSpace(resp)
@@ -125,7 +125,7 @@ func (bisque *BisQue) ProcessItem(request *dropin.LinkBisqueRequest) error {
 		return err
 	}
 
-	logger.Debugf("set an iRODS key/val for BisqueID to an iRODS object %s", request.IRODSPath)
+	logger.Infof("set an iRODS key/val for BisqueID to an iRODS object %s", request.IRODSPath)
 
 	return nil
 }

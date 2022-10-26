@@ -24,7 +24,7 @@ func CreateAmqp(service *AsyncExecCmdService, config *commons.AmqpConfig) (*AMQP
 		"function": "CreateAmqp",
 	})
 
-	logger.Debugf("connecting to AMQP %s", config.URL)
+	logger.Infof("connecting to AMQP %s", config.URL)
 
 	ac, err := amqp_mod.Dial(config.URL)
 	if err != nil {
@@ -54,7 +54,7 @@ func (amqp *AMQP) Release() {
 		"function": "Release",
 	})
 
-	logger.Debugf("trying to disconnect from %s", amqp.config.URL)
+	logger.Infof("trying to disconnect from %s", amqp.config.URL)
 
 	if amqp.channel != nil {
 		amqp.channel.Close()
@@ -98,6 +98,6 @@ func (amqp *AMQP) ProcessItem(request *dropin.SendMessageRequest) error {
 		return err
 	}
 
-	logger.Debugf("published an AMQP message with a subject %s", request.Key)
+	logger.Infof("published an AMQP message with a subject %s", request.Key)
 	return nil
 }

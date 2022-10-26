@@ -109,7 +109,7 @@ func (svc *AsyncExecCmdService) Scrape() {
 		"function": "Scrape",
 	})
 
-	logger.Debugf("checking drop-ins in %s", svc.config.DropInDirPath)
+	//logger.Debugf("checking drop-ins in %s", svc.config.DropInDirPath)
 	items, err := svc.dropin.Scrape()
 	if err != nil {
 		logger.Error(err)

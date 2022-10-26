@@ -23,7 +23,7 @@ func CreateNats(service *AsyncExecCmdService, config *commons.NatsConfig) (*NATS
 		"function": "CreateNats",
 	})
 
-	logger.Debugf("connecting to NATS %s", config.URL)
+	logger.Infof("connecting to NATS %s", config.URL)
 
 	clientID := fmt.Sprintf("%s%s", config.ClientIDPrefix, xid.New().String())
 	sc, err := stan.Connect(config.ClusterID, clientID, stan.NatsURL(config.URL))
@@ -47,7 +47,7 @@ func (nats *NATS) Release() {
 		"function": "Release",
 	})
 
-	logger.Debugf("trying to disconnect from %s", nats.config.URL)
+	logger.Infof("trying to disconnect from %s", nats.config.URL)
 
 	if nats.connection != nil {
 		nats.connection.Close()
@@ -77,6 +77,6 @@ func (nats *NATS) ProcessItem(request *dropin.SendMessageRequest) error {
 		return err
 	}
 
-	logger.Debugf("published a NATS message with a subject %s", request.Key)
+	logger.Infof("published a NATS message with a subject %s", request.Key)
 	return nil
 }
