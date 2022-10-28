@@ -12,17 +12,9 @@ const (
 
 	LogFilePathDefault string = "/tmp/irods_rule_async_exec_cmd.log"
 
-	NatsClientIDPrefixDefault string = "irods_rule_async_exec_cmd_"
-	IrodsPortDefault          int    = 1247
-	IrodsMountPathDefault     string = "/"
+	IrodsPortDefault      int    = 1247
+	IrodsMountPathDefault string = "/"
 )
-
-// NatsConfig is a configuration struct for NATS/STAN Message bus
-type NatsConfig struct {
-	URL            string `yaml:"url"`
-	ClusterID      string `yaml:"cluster_id"`
-	ClientIDPrefix string `yaml:"client_id_prefix,omitempty"`
-}
 
 // AmqpConfig is a configuration struct for AMQP Message bus
 type AmqpConfig struct {
@@ -51,7 +43,6 @@ type ServerConfig struct {
 	DropInDirPath string `yaml:"dropin_dir_path,omitempty"`
 
 	// iRODS FS Event Publish
-	NatsConfig NatsConfig `yaml:"nats_config,omitempty"`
 	AmqpConfig AmqpConfig `yaml:"amqp_config,omitempty"`
 
 	// Bisque
@@ -73,11 +64,6 @@ func NewDefaultServerConfig() *ServerConfig {
 	return &ServerConfig{
 		DropInDirPath: DropInDirPathDefault,
 
-		NatsConfig: NatsConfig{
-			URL:            "",
-			ClusterID:      "",
-			ClientIDPrefix: NatsClientIDPrefixDefault,
-		},
 		AmqpConfig: AmqpConfig{
 			URL:      "",
 			Exchange: "",
@@ -124,24 +110,12 @@ func (config *ServerConfig) Validate() error {
 		return errors.New("drop in dir path is not given")
 	}
 
-	if len(config.NatsConfig.URL) == 0 && len(config.AmqpConfig.URL) == 0 {
-		return errors.New("either NATS or AMQP config must be given")
+	if len(config.AmqpConfig.URL) == 0 {
+		return errors.New("AMQP URL is not given")
 	}
 
-	if len(config.NatsConfig.URL) > 0 {
-		if len(config.NatsConfig.ClusterID) == 0 {
-			return errors.New("NATS Cluster ID is not given")
-		}
-
-		if len(config.NatsConfig.ClientIDPrefix) == 0 {
-			return errors.New("NATS Client ID Prefix is not given")
-		}
-	}
-
-	if len(config.AmqpConfig.URL) > 0 {
-		if len(config.AmqpConfig.Exchange) == 0 {
-			return errors.New("AMQP Exchange is not given")
-		}
+	if len(config.AmqpConfig.Exchange) == 0 {
+		return errors.New("AMQP Exchange is not given")
 	}
 
 	if len(config.BisqueConfig.URL) == 0 {
@@ -185,14 +159,4 @@ func (config *ServerConfig) Validate() error {
 	}
 
 	return nil
-}
-
-// IsNats checks if the server config uses NATS
-func (config *ServerConfig) IsNATS() bool {
-	return len(config.NatsConfig.URL) > 0
-}
-
-// IsAMQP checks if the server config uses AMQP
-func (config *ServerConfig) IsAMQP() bool {
-	return len(config.AmqpConfig.URL) > 0
 }

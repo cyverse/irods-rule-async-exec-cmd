@@ -21,7 +21,6 @@ type AsyncExecCmdService struct {
 
 	bisque *BisQue
 	amqp   *AMQP
-	nats   *NATS
 
 	irods *IRODS
 
@@ -42,27 +41,15 @@ func Start(config *commons.ServerConfig) (*AsyncExecCmdService, error) {
 		terminateChan: make(chan bool),
 	}
 
-	if config.IsNATS() {
-		nats, err := CreateNats(service, &config.NatsConfig)
-		if err != nil {
-			logger.Error(err)
-			return nil, err
-		}
-
-		service.nats = nats
+	amqp, err := CreateAmqp(service, &config.AmqpConfig)
+	if err != nil {
+		logger.Error(err)
+		return nil, err
 	}
 
-	if config.IsAMQP() {
-		amqp, err := CreateAmqp(service, &config.AmqpConfig)
-		if err != nil {
-			logger.Error(err)
-			return nil, err
-		}
+	service.amqp = amqp
 
-		service.amqp = amqp
-	}
-
-	err := service.dropin.MakeDropInDir()
+	err = service.dropin.MakeDropInDir()
 	if err != nil {
 		logger.Error(err)
 		return nil, err
@@ -170,20 +157,8 @@ func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) error {
 			}
 		}
 
-		if svc.nats != nil {
-			if request, ok := item.(*dropin.SendMessageRequest); ok {
-				err := svc.nats.ProcessItem(request)
-				if err != nil {
-					logger.Error(err)
-					return err
-				}
-
-				processed = true
-			}
-		}
-
 		if !processed {
-			return fmt.Errorf("failed to process send_message request because neither AMQP nor NATS are configured")
+			return fmt.Errorf("failed to process send_message request because AMQP is not configured")
 		}
 	case dropin.LinkBisqueRequestType:
 		processed := false

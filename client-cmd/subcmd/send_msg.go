@@ -14,7 +14,7 @@ import (
 var sendMsgCmd = &cobra.Command{
 	Use:   "send_msg [key] [body]",
 	Short: "Send a message to MessageBus",
-	Long: `This buffers a message to be sent to AMQP or NATS(STAN) message server.
+	Long: `This buffers a message to be sent to AMQP message server.
 	The message is stored in the drop in dir temporarily, then processed by the service.`,
 	RunE: processSendMsgCommand,
 }

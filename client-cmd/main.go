@@ -13,7 +13,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "irods-rule-async-exec-cmd [args..]",
 	Short: "Queue a command to be exectued asynchronously",
-	Long:  "Queue a command to be exectued asynchronously. The comand can be either 'Message' or 'BisQue Data Control Request'. Messages are routed to AMQP or NATS(STAN) service configured, and BisQue Data Control Requests are routed to BisQue server configured.",
+	Long:  "Queue a command to be exectued asynchronously. The comand can be either 'Message' or 'BisQue Data Control Request'. Messages are routed to AMQP service configured, and BisQue Data Control Requests are routed to BisQue server configured.",
 	RunE:  processCommand,
 }
 
