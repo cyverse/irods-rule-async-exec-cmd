@@ -53,7 +53,11 @@ func (amqp *AMQP) ensureConnected() error {
 	if amqp.connection == nil || amqp.channel == nil {
 		// disconnected - try to connect
 		if time.Now().After(amqp.lastConnectTrialTime.Add(commons.ReconnectInterval)) {
+			// passed reconnect interval
 			return amqp.connect()
+		} else {
+			// too early to reconnect
+			return fmt.Errorf("ignore reconnect request. will try after %f seconds from last trial", commons.ReconnectInterval.Seconds())
 		}
 	}
 
@@ -71,21 +75,25 @@ func (amqp *AMQP) connect() error {
 
 	amqp.lastConnectTrialTime = time.Now()
 
+	amqp.connection = nil
+	amqp.channel = nil
+
 	connection, err := amqp_mod.Dial(amqp.config.URL)
 	if err != nil {
 		logger.WithError(err).Errorf("failed to connect to %s", amqp.config.URL)
 		return err
 	}
 
-	amqp.connection = connection
-
-	channel, err := amqp.connection.Channel()
+	channel, err := connection.Channel()
 	if err != nil {
 		logger.WithError(err).Error("failed to open a channel")
 		return err
 	}
 
+	amqp.connection = connection
 	amqp.channel = channel
+
+	logger.Infof("connected to AMQP %s", amqp.config.URL)
 	return nil
 }
 
