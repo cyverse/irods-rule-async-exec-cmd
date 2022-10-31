@@ -2,24 +2,34 @@ package service
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
 	"github.com/cyverse/irods-rule-async-exec-cmd/dropin"
+	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
 	amqp_mod "github.com/streadway/amqp"
 )
+
+const (
+	AMQPConsumerQueueName string = "irods_rule_async_exec_cmd"
+)
+
+type AmqpEventHandler func(msg amqp_mod.Delivery)
 
 type AMQP struct {
 	service              *AsyncExecCmdService
 	config               *commons.AmqpConfig
 	connection           *amqp_mod.Connection
 	channel              *amqp_mod.Channel
+	queue                *amqp_mod.Queue
 	lastConnectTrialTime time.Time
+	eventHandler         AmqpEventHandler
 }
 
 // CreateAmqp creates a AMQP service object and connects to AMQP
-func CreateAmqp(service *AsyncExecCmdService, config *commons.AmqpConfig) (*AMQP, error) {
+func CreateAmqp(service *AsyncExecCmdService, config *commons.AmqpConfig, hander AmqpEventHandler) (*AMQP, error) {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"function": "CreateAmqp",
@@ -30,12 +40,13 @@ func CreateAmqp(service *AsyncExecCmdService, config *commons.AmqpConfig) (*AMQP
 		service:              service,
 		config:               config,
 		lastConnectTrialTime: time.Time{},
+		eventHandler:         hander,
 	}
 
 	err := amqp.ensureConnected()
 	if err != nil {
 		logger.WithError(err).Warn("will retry again")
-		// ignore
+		// ignore error
 	}
 
 	return amqp, nil
@@ -47,10 +58,11 @@ func (amqp *AMQP) ensureConnected() error {
 			// clear
 			amqp.connection = nil
 			amqp.channel = nil
+			amqp.queue = nil
 		}
 	}
 
-	if amqp.connection == nil || amqp.channel == nil {
+	if amqp.connection == nil || amqp.channel == nil || amqp.queue == nil {
 		// disconnected - try to connect
 		if time.Now().After(amqp.lastConnectTrialTime.Add(commons.ReconnectInterval)) {
 			// passed reconnect interval
@@ -77,6 +89,7 @@ func (amqp *AMQP) connect() error {
 
 	amqp.connection = nil
 	amqp.channel = nil
+	amqp.queue = nil
 
 	connection, err := amqp_mod.Dial(amqp.config.URL)
 	if err != nil {
@@ -90,10 +103,45 @@ func (amqp *AMQP) connect() error {
 		return err
 	}
 
+	quename := amqp.getQueueName()
+	logger.Infof("Declaring a queue %s", quename)
+
+	queue, err := channel.QueueDeclare(quename, false, true, false, false, amqp_mod.Table{})
+	if err != nil {
+		logger.WithError(err).Errorf("failed to declare a queue")
+		return err
+	}
+
+	// bind queue to listen fs events
+	err = channel.QueueBind(queue.Name, "#", amqp.config.Exchange, false, amqp_mod.Table{})
+	if err != nil {
+		logger.WithError(err).Errorf("failed to bind the queue")
+		return err
+	}
+
 	amqp.connection = connection
 	amqp.channel = channel
+	amqp.queue = &queue
 
 	logger.Infof("connected to AMQP %s", amqp.config.URL)
+
+	go func() {
+		for amqp.connection != nil && !amqp.connection.IsClosed() {
+			msgs, err := amqp.channel.Consume(amqp.queue.Name, "", true, false, false, false, nil)
+			if err != nil {
+				logger.WithError(err).Error("failed to consume a message")
+				return
+			}
+
+			for msg := range msgs {
+				// pass to handlers registered
+				if amqp.eventHandler != nil {
+					amqp.eventHandler(msg)
+				}
+			}
+		}
+	}()
+
 	return nil
 }
 
@@ -107,6 +155,10 @@ func (amqp *AMQP) Release() {
 
 	logger.Infof("trying to disconnect from %s", amqp.config.URL)
 
+	if amqp.queue != nil {
+		amqp.queue = nil
+	}
+
 	if amqp.channel != nil {
 		amqp.channel.Close()
 		amqp.channel = nil
@@ -118,15 +170,24 @@ func (amqp *AMQP) Release() {
 		}
 		amqp.connection = nil
 	}
+
+	amqp.eventHandler = nil
 }
 
 // ProcessItem processes a drop-in send_message request, publishing a AMQP message
-func (amqp *AMQP) ProcessItem(request *dropin.SendMessageRequest) error {
+func (amqp *AMQP) ProcessItem(item dropin.DropInItem) error {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "AMQP",
 		"function": "ProcessItem",
 	})
+
+	request, ok := item.(*dropin.SendMessageRequest)
+	if !ok {
+		err := fmt.Errorf("failed to convert item to SendMessageRequest")
+		logger.Error(err)
+		return err
+	}
 
 	err := amqp.ensureConnected()
 	if err != nil {
@@ -157,4 +218,13 @@ func (amqp *AMQP) ProcessItem(request *dropin.SendMessageRequest) error {
 
 	logger.Infof("published an AMQP message with a subject %s", request.Key)
 	return nil
+}
+
+func (amqp *AMQP) getQueueName() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = fmt.Sprintf("autocreated.%s", xid.New().String())
+	}
+
+	return fmt.Sprintf("%s.%s", AMQPConsumerQueueName, hostname)
 }

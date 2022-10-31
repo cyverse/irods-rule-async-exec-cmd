@@ -13,7 +13,7 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "irods-rule-async-exec-cmd [args..]",
 	Short: "Queue a command to be exectued asynchronously",
-	Long:  "Queue a command to be exectued asynchronously. The comand can be either 'Message' or 'BisQue Data Control Request'. Messages are routed to AMQP service configured, and BisQue Data Control Requests are routed to BisQue server configured.",
+	Long:  "Queue a command to be exectued asynchronously. The command can be either 'Send Message' or 'BisQue Data Control Request'. Messages are routed to AMQP service configured, and BisQue Data Control Requests are routed to BisQue server configured.",
 	RunE:  processCommand,
 }
 
@@ -61,6 +61,8 @@ func main() {
 	// add sub commands
 	subcmd.AddSendMsgCommand(rootCmd)
 	subcmd.AddLinkBisqueCommand(rootCmd)
+	subcmd.AddRemoveBisqueCommand(rootCmd)
+	subcmd.AddMoveBisqueCommand(rootCmd)
 
 	err := Execute()
 	if err != nil {

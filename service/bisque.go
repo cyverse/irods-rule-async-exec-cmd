@@ -2,18 +2,19 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/antchfx/xmlquery"
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
 	"github.com/cyverse/irods-rule-async-exec-cmd/dropin"
 	log "github.com/sirupsen/logrus"
+	amqp_mod "github.com/streadway/amqp"
 )
 
 const (
@@ -57,12 +58,211 @@ func (bisque *BisQue) Release() {
 	}
 }
 
-// ProcessItem processes a drop-in link_bisque request, sending a HTTP request
-func (bisque *BisQue) ProcessItem(request *dropin.LinkBisqueRequest) error {
+// ProcessItem processes a drop-in request
+func (bisque *BisQue) HandleAmqpEvent(msg amqp_mod.Delivery) {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "HandleAmqpEvent",
+	})
+
+	if strings.Contains(string(msg.Body), "\r") {
+		logger.Error("body with return in it: %s\n", string(msg.Body))
+		return
+	}
+
+	switch msg.RoutingKey {
+	case "data-object.add":
+		bisque.processAddMessage(msg)
+		return
+	case "data-object.mv":
+		bisque.processMoveMessage(msg)
+		return
+	case "data-object.rm":
+		bisque.processRemoveMessage(msg)
+		return
+	default:
+		// event is not interested
+		return
+	}
+}
+
+func (bisque *BisQue) processAddMessage(msg amqp_mod.Delivery) {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "processAddMessage",
+	})
+
+	body := map[string]interface{}{}
+	err := json.Unmarshal(msg.Body, &body)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to parse message body - %s : %v", msg.RoutingKey, string(msg.Body))
+		return
+	}
+
+	author := body["author"].(string)
+	path := body["path"].(string)
+	if !bisque.isIrodsPathForBisque(path) {
+		// ignore
+		logger.Debugf("ignoring add message since the iRODS path %s is out of iRODS root path %s", path, bisque.config.IrodsRootPath)
+		return
+	}
+
+	request := dropin.LinkBisqueRequest{
+		IRODSUsername: bisque.getHomeUser(path, author),
+		IRODSPath:     path,
+	}
+	err = bisque.ProcessLinkBisqueRequest(&request)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to process a message - %s", msg.RoutingKey)
+		return
+	}
+}
+
+func (bisque *BisQue) processMoveMessage(msg amqp_mod.Delivery) {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "processMoveMessage",
+	})
+
+	body := map[string]interface{}{}
+	err := json.Unmarshal(msg.Body, &body)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to parse message body - %s : %v", msg.RoutingKey, string(msg.Body))
+		return
+	}
+
+	author := body["author"].(string)
+	oldPath := body["old-path"].(string)
+	newPath := body["new-path"].(string)
+
+	if bisque.isIrodsPathForBisque(oldPath) {
+		if bisque.isIrodsPathForBisque(newPath) {
+			request := dropin.MoveBisqueRequest{
+				IRODSUsername:   bisque.getHomeUser(newPath, author),
+				SourceIRODSPath: oldPath,
+				DestIRODSPath:   newPath,
+			}
+			err = bisque.ProcessMoveBisqueRequest(&request)
+			if err != nil {
+				logger.WithError(err).Errorf("failed to process a message - %s", msg.RoutingKey)
+				return
+			}
+			return
+		} else {
+			request := dropin.RemoveBisqueRequest{
+				IRODSUsername: bisque.getHomeUser(oldPath, author),
+				IRODSPath:     oldPath,
+			}
+			err = bisque.ProcessRemoveBisqueRequest(&request)
+			if err != nil {
+				logger.WithError(err).Errorf("failed to process a message - %s", msg.RoutingKey)
+				return
+			}
+			return
+		}
+	} else {
+		if bisque.isIrodsPathForBisque(newPath) {
+			// link
+			request := dropin.LinkBisqueRequest{
+				IRODSUsername: bisque.getHomeUser(newPath, author),
+				IRODSPath:     newPath,
+			}
+			err = bisque.ProcessLinkBisqueRequest(&request)
+			if err != nil {
+				logger.WithError(err).Errorf("failed to process a message - %s", msg.RoutingKey)
+				return
+			}
+			return
+		} else {
+			// ignore
+			logger.Debugf("ignoring moving message since the iRODS path %s and %s are out of iRODS root path %s", oldPath, newPath, bisque.config.IrodsRootPath)
+			return
+		}
+	}
+}
+
+func (bisque *BisQue) processRemoveMessage(msg amqp_mod.Delivery) {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "processRemoveMessage",
+	})
+
+	body := map[string]interface{}{}
+	err := json.Unmarshal(msg.Body, &body)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to parse message body - %s : %v", msg.RoutingKey, string(msg.Body))
+		return
+	}
+
+	author := body["author"].(string)
+	path := body["path"].(string)
+	if !bisque.isIrodsPathForBisque(path) {
+		// ignore
+		logger.Debugf("ignoring remove message since the iRODS path %s is out of iRODS root path %s", path, bisque.config.IrodsRootPath)
+		return
+	}
+
+	request := dropin.RemoveBisqueRequest{
+		IRODSUsername: author,
+		IRODSPath:     path,
+	}
+	err = bisque.ProcessRemoveBisqueRequest(&request)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to process a message - %s", msg.RoutingKey)
+		return
+	}
+}
+
+// ProcessItem processes a drop-in request
+func (bisque *BisQue) ProcessItem(item dropin.DropInItem) error {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "BisQue",
 		"function": "ProcessItem",
+	})
+
+	switch item.GetRequestType() {
+	case dropin.LinkBisqueRequestType:
+		request, ok := item.(*dropin.LinkBisqueRequest)
+		if !ok {
+			err := fmt.Errorf("failed to convert item to LinkBisqueRequest")
+			logger.Error(err)
+			return err
+		}
+		return bisque.ProcessLinkBisqueRequest(request)
+	case dropin.RemoveBisqueRequestType:
+		request, ok := item.(*dropin.RemoveBisqueRequest)
+		if !ok {
+			err := fmt.Errorf("failed to convert item to RemoveBisqueRequest")
+			logger.Error(err)
+			return err
+		}
+		return bisque.ProcessRemoveBisqueRequest(request)
+	case dropin.MoveBisqueRequestType:
+		request, ok := item.(*dropin.MoveBisqueRequest)
+		if !ok {
+			err := fmt.Errorf("failed to convert item to MoveBisqueRequest")
+			logger.Error(err)
+			return err
+		}
+		return bisque.ProcessMoveBisqueRequest(request)
+	default:
+		err := fmt.Errorf("unknown item type %s", item.GetRequestType())
+		logger.Error(err)
+		return err
+	}
+}
+
+// ProcessLinkBisqueRequest processes a drop-in link_bisque request, sending a HTTP request
+func (bisque *BisQue) ProcessLinkBisqueRequest(request *dropin.LinkBisqueRequest) error {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "ProcessLinkBisqueRequest",
 	})
 
 	logger.Debugf("trying to send a HTTP request for linking an iRODS object %s", request.IRODSPath)
@@ -130,6 +330,132 @@ func (bisque *BisQue) ProcessItem(request *dropin.LinkBisqueRequest) error {
 	return nil
 }
 
+// ProcessRemoveBisqueRequest processes a drop-in remove_bisque request, sending a HTTP request
+func (bisque *BisQue) ProcessRemoveBisqueRequest(request *dropin.RemoveBisqueRequest) error {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "ProcessRemoveBisqueRequest",
+	})
+
+	logger.Debugf("trying to send a HTTP request for removing an iRODS object %s", request.IRODSPath)
+
+	if len(request.IRODSPath) == 0 || len(request.IRODSUsername) == 0 {
+		err := fmt.Errorf("failed to send a HTTP request for removing an iRODS object %s", request.IRODSPath)
+		logger.Error(err)
+		return err
+	}
+
+	bisqueUrl := bisque.getApiUrl("/blob_service/paths/remove")
+
+	irodsPathFromBisque, err := bisque.getIrodsURL(request.IRODSPath)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to get iRODS URL for removing an iRODS object %s", request.IRODSPath)
+		return err
+	}
+
+	params := map[string]string{
+		"user": request.IRODSUsername,
+		"path": irodsPathFromBisque,
+	}
+
+	_, err = bisque.get(bisqueUrl, params)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to send a HTTP request for removing an iRODS object %s", request.IRODSPath)
+		return err
+	}
+
+	logger.Infof("published a HTTP request for removing an iRODS object %s (bisque path: %s)", request.IRODSPath, irodsPathFromBisque)
+
+	return nil
+}
+
+// ProcessMoveBisqueRequest processes a drop-in move_bisque request, sending a HTTP request
+func (bisque *BisQue) ProcessMoveBisqueRequest(request *dropin.MoveBisqueRequest) error {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "ProcessMoveBisqueRequest",
+	})
+
+	logger.Debugf("trying to send a HTTP request for moving an iRODS object %s to %s", request.SourceIRODSPath, request.DestIRODSPath)
+
+	if len(request.SourceIRODSPath) == 0 || len(request.DestIRODSPath) == 0 || len(request.IRODSUsername) == 0 {
+		err := fmt.Errorf("failed to send a HTTP request for moving an iRODS object %s to %s", request.SourceIRODSPath, request.DestIRODSPath)
+		logger.Error(err)
+		return err
+	}
+
+	bisqueUrl := bisque.getApiUrl("/blob_service/paths/move")
+
+	sourceIrodsPathFromBisque, err := bisque.getIrodsURL(request.SourceIRODSPath)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to get iRODS URL for moving an iRODS object %s", request.SourceIRODSPath)
+		return err
+	}
+
+	destIrodsPathFromBisque, err := bisque.getIrodsURL(request.DestIRODSPath)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to get iRODS URL for moving an iRODS object %s", request.DestIRODSPath)
+		return err
+	}
+
+	params := map[string]string{
+		"user":        request.IRODSUsername,
+		"path":        sourceIrodsPathFromBisque,
+		"destination": destIrodsPathFromBisque,
+	}
+
+	_, err = bisque.get(bisqueUrl, params)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to send a HTTP request for moving an iRODS object %s", request.SourceIRODSPath)
+		return err
+	}
+
+	logger.Infof("published a HTTP request for moving an iRODS object %s (bisque path: %s) to %s (bisque path: %s", request.SourceIRODSPath, &sourceIrodsPathFromBisque, request.DestIRODSPath, destIrodsPathFromBisque)
+
+	return nil
+}
+
+func (bisque *BisQue) get(url string, params map[string]string) (string, error) {
+	req, err := http.NewRequestWithContext(bisque.context, http.MethodGet, url, nil)
+	if err != nil {
+		return "", err
+	}
+
+	// add params
+	query := req.URL.Query()
+	for paramKey, paramVal := range params {
+		query.Add(paramKey, paramVal)
+	}
+	req.URL.RawQuery = query.Encode()
+
+	// basic-auth
+	req.SetBasicAuth(bisque.config.AdminUsername, bisque.config.AdminPassword)
+	req.Header.Add("content-type", "application/xml")
+
+	resp, err := bisque.client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	// read body
+	resBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	resp.Body.Close()
+
+	// check if status is ok
+	if resp.StatusCode != http.StatusOK {
+		// error
+		return "", fmt.Errorf("BisQue responded an error %s (%d) - %s", resp.Status, resp.StatusCode, string(resBody))
+	}
+
+	// success, return body
+	return string(resBody), nil
+}
+
 func (bisque *BisQue) post(url string, params map[string]string, body string) (string, error) {
 	req, err := http.NewRequestWithContext(bisque.context, http.MethodPost, url, nil)
 	if err != nil {
@@ -175,14 +501,39 @@ func (bisque *BisQue) getApiUrl(path string) string {
 }
 
 func (bisque *BisQue) getIrodsURL(irodsPath string) (string, error) {
-	rel, err := filepath.Rel(bisque.config.IrodsMountPath, irodsPath)
-	if err != nil {
-		return "", err
+	base := fmt.Sprintf("%s/", strings.TrimRight(bisque.config.IrodsRootPath, "/"))
+	if !strings.HasPrefix(irodsPath, base) {
+		return "", fmt.Errorf("iRODS Path %s is not under iRODS root path %s", irodsPath, bisque.config.IrodsRootPath)
 	}
 
-	if strings.HasPrefix(rel, "./") || strings.HasPrefix(rel, "../") {
-		return "", fmt.Errorf("iRODS Path %s is not under mount path %s", irodsPath, bisque.config.IrodsMountPath)
-	}
+	rel := irodsPath[len(base):]
 
 	return fmt.Sprintf("%s/%s", strings.TrimRight(bisque.config.IrodsBaseURL, "/"), strings.TrimLeft(rel, "/")), nil
+}
+
+func (bisque *BisQue) isIrodsPathForBisque(irodsPath string) bool {
+	base := fmt.Sprintf("%s/", strings.TrimRight(bisque.config.IrodsRootPath, "/"))
+	return strings.HasPrefix(irodsPath, base)
+}
+
+func (bisque *BisQue) getHomeUser(irodsPath string, defaultUser string) string {
+	zonePrefix := fmt.Sprintf("/%s/", bisque.config.IrodsZone)
+	trashPrefix := fmt.Sprintf("/%s/trash/", bisque.config.IrodsZone)
+	if strings.HasPrefix(irodsPath, trashPrefix) {
+		// starts with /trash/zone/
+		rest := bisque.config.IrodsZone[len(trashPrefix):]
+		if len(rest) > 0 {
+			paths := strings.Split(rest, "/")
+			return paths[0]
+		}
+	} else if strings.HasPrefix(irodsPath, zonePrefix) {
+		// starts with /zone/
+		rest := bisque.config.IrodsZone[len(zonePrefix):]
+		if len(rest) > 0 {
+			paths := strings.Split(rest, "/")
+			return paths[0]
+		}
+	}
+
+	return defaultUser
 }

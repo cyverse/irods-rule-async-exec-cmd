@@ -10,8 +10,10 @@ import (
 type DropInRequestType string
 
 const (
-	SendMessageRequestType DropInRequestType = "send_message"
-	LinkBisqueRequestType  DropInRequestType = "link_bisque"
+	SendMessageRequestType  DropInRequestType = "send_message"
+	LinkBisqueRequestType   DropInRequestType = "link_bisque"
+	RemoveBisqueRequestType DropInRequestType = "remove_bisque"
+	MoveBisqueRequestType   DropInRequestType = "move_bisque"
 )
 
 // DropInItem is an interface that all drop-in items must implement
@@ -182,6 +184,128 @@ func (request *LinkBisqueRequest) MarshalJson() ([]byte, error) {
 }
 
 func (request *LinkBisqueRequest) SaveToFile(path string) error {
+	bytes, err := request.MarshalJson()
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(path, bytes, 0o666)
+}
+
+type RemoveBisqueRequest struct {
+	DropInItemBase
+
+	IRODSUsername string `json:"irods_username"`
+	IRODSPath     string `json:"irods_path"`
+}
+
+func NewRemoveBisqueRequest(irodsUsername string, irodsPath string) *RemoveBisqueRequest {
+	return &RemoveBisqueRequest{
+		DropInItemBase: DropInItemBase{
+			Type: RemoveBisqueRequestType,
+		},
+		IRODSUsername: irodsUsername,
+		IRODSPath:     irodsPath,
+	}
+}
+
+func NewRemoveBisqueRequestFromBytes(bytes []byte) (*RemoveBisqueRequest, error) {
+	var request RemoveBisqueRequest
+	err := json.Unmarshal(bytes, &request)
+	if err != nil {
+		return nil, err
+	}
+
+	return &request, nil
+}
+
+func (request *RemoveBisqueRequest) GetRequestType() DropInRequestType {
+	return request.Type
+}
+
+func (request *RemoveBisqueRequest) GetItemFilePath() string {
+	return request.FilePath
+}
+
+func (request *RemoveBisqueRequest) SetItemFilePath(path string) {
+	request.FilePath = path
+}
+
+func (request *RemoveBisqueRequest) DeleteItemFile() error {
+	if len(request.FilePath) == 0 {
+		return fmt.Errorf("file path of the drop-in item is empty")
+	}
+
+	return os.Remove(request.FilePath)
+}
+
+func (request *RemoveBisqueRequest) MarshalJson() ([]byte, error) {
+	return json.Marshal(request)
+}
+
+func (request *RemoveBisqueRequest) SaveToFile(path string) error {
+	bytes, err := request.MarshalJson()
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(path, bytes, 0o666)
+}
+
+type MoveBisqueRequest struct {
+	DropInItemBase
+
+	IRODSUsername   string `json:"irods_username"`
+	SourceIRODSPath string `json:"source_irods_path"`
+	DestIRODSPath   string `json:"dest_irods_path"`
+}
+
+func NewMoveBisqueRequest(irodsUsername string, sourceIrodsPath string, destIrodsPath string) *MoveBisqueRequest {
+	return &MoveBisqueRequest{
+		DropInItemBase: DropInItemBase{
+			Type: MoveBisqueRequestType,
+		},
+		IRODSUsername:   irodsUsername,
+		SourceIRODSPath: sourceIrodsPath,
+		DestIRODSPath:   destIrodsPath,
+	}
+}
+
+func NewMoveBisqueRequestFromBytes(bytes []byte) (*MoveBisqueRequest, error) {
+	var request MoveBisqueRequest
+	err := json.Unmarshal(bytes, &request)
+	if err != nil {
+		return nil, err
+	}
+
+	return &request, nil
+}
+
+func (request *MoveBisqueRequest) GetRequestType() DropInRequestType {
+	return request.Type
+}
+
+func (request *MoveBisqueRequest) GetItemFilePath() string {
+	return request.FilePath
+}
+
+func (request *MoveBisqueRequest) SetItemFilePath(path string) {
+	request.FilePath = path
+}
+
+func (request *MoveBisqueRequest) DeleteItemFile() error {
+	if len(request.FilePath) == 0 {
+		return fmt.Errorf("file path of the drop-in item is empty")
+	}
+
+	return os.Remove(request.FilePath)
+}
+
+func (request *MoveBisqueRequest) MarshalJson() ([]byte, error) {
+	return json.Marshal(request)
+}
+
+func (request *MoveBisqueRequest) SaveToFile(path string) error {
 	bytes, err := request.MarshalJson()
 	if err != nil {
 		return err

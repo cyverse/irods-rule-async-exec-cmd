@@ -41,7 +41,23 @@ func Start(config *commons.ServerConfig) (*AsyncExecCmdService, error) {
 		terminateChan: make(chan bool),
 	}
 
-	amqp, err := CreateAmqp(service, &config.AmqpConfig)
+	irods, err := CreateIrods(service, &config.IrodsConfig)
+	if err != nil {
+		logger.Error(err)
+		return nil, err
+	}
+
+	service.irods = irods
+
+	bisque, err := CreateBisque(service, &config.BisqueConfig)
+	if err != nil {
+		logger.Error(err)
+		return nil, err
+	}
+
+	service.bisque = bisque
+
+	amqp, err := CreateAmqp(service, &config.AmqpConfig, bisque.HandleAmqpEvent)
 	if err != nil {
 		logger.Error(err)
 		return nil, err
@@ -84,6 +100,21 @@ func (svc *AsyncExecCmdService) Stop() error {
 	})
 
 	logger.Info("Stopping the Async Exec Cmd Service")
+
+	if svc.amqp != nil {
+		svc.amqp.Release()
+		svc.amqp = nil
+	}
+
+	if svc.bisque != nil {
+		svc.bisque.Release()
+		svc.bisque = nil
+	}
+
+	if svc.irods != nil {
+		svc.irods.Release()
+		svc.irods = nil
+	}
 
 	return nil
 }
@@ -146,36 +177,32 @@ func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) error {
 	case dropin.SendMessageRequestType:
 		processed := false
 		if svc.amqp != nil {
-			if request, ok := item.(*dropin.SendMessageRequest); ok {
-				err := svc.amqp.ProcessItem(request)
-				if err != nil {
-					logger.Error(err)
-					return err
-				}
-
-				processed = true
+			err := svc.amqp.ProcessItem(item)
+			if err != nil {
+				logger.Error(err)
+				return err
 			}
+
+			processed = true
 		}
 
 		if !processed {
 			return fmt.Errorf("failed to process send_message request because AMQP is not configured")
 		}
-	case dropin.LinkBisqueRequestType:
+	case dropin.LinkBisqueRequestType, dropin.RemoveBisqueRequestType, dropin.MoveBisqueRequestType:
 		processed := false
 		if svc.bisque != nil {
-			if request, ok := item.(*dropin.LinkBisqueRequest); ok {
-				err := svc.bisque.ProcessItem(request)
-				if err != nil {
-					logger.Error(err)
-					return err
-				}
-
-				processed = true
+			err := svc.bisque.ProcessItem(item)
+			if err != nil {
+				logger.Error(err)
+				return err
 			}
+
+			processed = true
 		}
 
 		if !processed {
-			return fmt.Errorf("failed to process link_bisque request because BisQue is not configured")
+			return fmt.Errorf("failed to process bisque request because BisQue is not configured")
 		}
 	default:
 		return fmt.Errorf("failed to process unknown request %s", item.GetRequestType())

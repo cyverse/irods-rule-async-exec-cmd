@@ -12,8 +12,8 @@ const (
 
 	LogFilePathDefault string = "/tmp/irods_rule_async_exec_cmd.log"
 
-	IrodsPortDefault      int    = 1247
-	IrodsMountPathDefault string = "/"
+	IrodsPortDefault     int    = 1247
+	IrodsRootPathDefault string = "/"
 )
 
 // AmqpConfig is a configuration struct for AMQP Message bus
@@ -23,11 +23,12 @@ type AmqpConfig struct {
 }
 
 type BisqueConfig struct {
-	URL            string `yaml:"url"`
-	AdminUsername  string `yaml:"admin_username"`
-	AdminPassword  string `yaml:"admin_password"`
-	IrodsBaseURL   string `yaml:"irods_base_url"`   // include http:// or file://
-	IrodsMountPath string `yaml:"irods_mount_path"` // e.g., '/' datastore, '/iplant/home' for ucsb
+	URL           string `yaml:"url"`
+	AdminUsername string `yaml:"admin_username"`
+	AdminPassword string `yaml:"admin_password"`
+	IrodsZone     string `yaml:"zone"`
+	IrodsBaseURL  string `yaml:"irods_base_url"`  // include http:// or file://
+	IrodsRootPath string `yaml:"irods_root_path"` // e.g., '/' datastore, '/iplant/home' for ucsb
 }
 
 type IrodsConfig struct {
@@ -70,10 +71,11 @@ func NewDefaultServerConfig() *ServerConfig {
 		},
 
 		BisqueConfig: BisqueConfig{
-			URL:            "",
-			AdminUsername:  "",
-			AdminPassword:  "",
-			IrodsMountPath: IrodsMountPathDefault,
+			URL:           "",
+			AdminUsername: "",
+			AdminPassword: "",
+			IrodsZone:     "",
+			IrodsRootPath: IrodsRootPathDefault,
 		},
 
 		IrodsConfig: IrodsConfig{
@@ -130,12 +132,16 @@ func (config *ServerConfig) Validate() error {
 		return errors.New("BisQue Admin Password is not given")
 	}
 
+	if len(config.BisqueConfig.IrodsZone) == 0 {
+		return errors.New("BisQue iRODS Zone is not given")
+	}
+
 	if len(config.BisqueConfig.IrodsBaseURL) == 0 {
 		return errors.New("BisQue iRODS Base URL is not given")
 	}
 
-	if len(config.BisqueConfig.IrodsMountPath) == 0 {
-		return errors.New("BisQue iRODS Mount Path is not given")
+	if len(config.BisqueConfig.IrodsRootPath) == 0 {
+		return errors.New("BisQue iRODS Root Path is not given")
 	}
 
 	if len(config.IrodsConfig.Host) == 0 {
