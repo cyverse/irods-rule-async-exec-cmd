@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"time"
 
 	irods_fs "github.com/cyverse/go-irodsclient/fs"
 	irods_types "github.com/cyverse/go-irodsclient/irods/types"
@@ -15,9 +16,10 @@ const (
 )
 
 type IRODS struct {
-	service  *AsyncExecCmdService
-	config   *commons.IrodsConfig
-	fsClient *irods_fs.FileSystem
+	service              *AsyncExecCmdService
+	config               *commons.IrodsConfig
+	fsClient             *irods_fs.FileSystem
+	lastConnectTrialTime time.Time
 }
 
 // CreateIrods creates an iRODS service object and connects to iRODS
@@ -27,25 +29,62 @@ func CreateIrods(service *AsyncExecCmdService, config *commons.IrodsConfig) (*IR
 		"function": "CreateIrods",
 	})
 
-	logger.Infof("connecting to iRODS host %s:%d, zone %s, user %s", config.Host, config.Port, config.Zone, config.AdminUsername)
+	// lazy connect
+	irods := &IRODS{
+		service:              service,
+		config:               config,
+		lastConnectTrialTime: time.Time{},
+	}
 
-	account, err := irods_types.CreateIRODSAccount(config.Host, config.Port, config.AdminUsername, config.Zone, irods_types.AuthSchemeNative, config.AdminPassword, "")
+	err := irods.ensureConnected()
 	if err != nil {
-		logger.WithError(err).Errorf("failed to create an iRODS account for host %s:%d, zone %s, user %s", config.Host, config.Port, config.Zone, config.AdminUsername)
-		return nil, err
+		logger.WithError(err).Warn("will retry again")
+		// ignore error
+	}
+
+	return irods, nil
+}
+
+func (irods *IRODS) ensureConnected() error {
+	if irods.fsClient == nil {
+		if time.Now().After(irods.lastConnectTrialTime.Add(commons.ReconnectInterval)) {
+			// passed reconnect interval
+			return irods.connect()
+		} else {
+			// too early to reconnect
+			return fmt.Errorf("ignore reconnect request. will try after %f seconds from last trial", commons.ReconnectInterval.Seconds())
+		}
+	}
+
+	return nil
+}
+
+func (irods *IRODS) connect() error {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "IRODS",
+		"function": "connect",
+	})
+
+	logger.Infof("connecting to iRODS host %s:%d, zone %s, user %s", irods.config.Host, irods.config.Port, irods.config.Zone, irods.config.AdminUsername)
+
+	irods.lastConnectTrialTime = time.Now()
+	irods.fsClient = nil
+
+	account, err := irods_types.CreateIRODSAccount(irods.config.Host, irods.config.Port, irods.config.AdminUsername, irods.config.Zone, irods_types.AuthSchemeNative, irods.config.AdminPassword, "")
+	if err != nil {
+		logger.WithError(err).Errorf("failed to create an iRODS account for host %s:%d, zone %s, user %s", irods.config.Host, irods.config.Port, irods.config.Zone, irods.config.AdminUsername)
+		return err
 	}
 
 	fs, err := irods_fs.NewFileSystemWithDefault(account, irodsClientName)
 	if err != nil {
-		logger.WithError(err).Errorf("failed to create an iRODS FileSystem Client for iRODS host %s:%d, zone %s, user %s", config.Host, config.Port, config.Zone, config.AdminUsername)
-		return nil, err
+		logger.WithError(err).Errorf("failed to create an iRODS FileSystem Client for iRODS host %s:%d, zone %s, user %s", irods.config.Host, irods.config.Port, irods.config.Zone, irods.config.AdminUsername)
+		return err
 	}
 
-	return &IRODS{
-		service:  service,
-		config:   config,
-		fsClient: fs,
-	}, nil
+	irods.fsClient = fs
+	return nil
 }
 
 // Release releases all resources, disconnecting from IRODS
@@ -71,6 +110,12 @@ func (irods *IRODS) SetKeyVal(irodsPath string, key string, val string) error {
 		"struct":   "IRODS",
 		"function": "SetKeyVal",
 	})
+
+	err := irods.ensureConnected()
+	if err != nil {
+		logger.Error(err)
+		return err
+	}
 
 	logger.Debugf("trying to set a key/val to an iRODS collection/data-object %s, key: %s", irodsPath, key)
 
