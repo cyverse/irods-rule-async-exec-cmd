@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	irods_fs "github.com/cyverse/go-irodsclient/fs"
@@ -20,6 +21,7 @@ type IRODS struct {
 	config               *commons.IrodsConfig
 	fsClient             *irods_fs.FileSystem
 	lastConnectTrialTime time.Time
+	connectionLock       sync.Mutex
 }
 
 // CreateIrods creates an iRODS service object and connects to iRODS
@@ -34,6 +36,7 @@ func CreateIrods(service *AsyncExecCmdService, config *commons.IrodsConfig) (*IR
 		service:              service,
 		config:               config,
 		lastConnectTrialTime: time.Time{},
+		connectionLock:       sync.Mutex{},
 	}
 
 	err := irods.ensureConnected()
@@ -46,6 +49,9 @@ func CreateIrods(service *AsyncExecCmdService, config *commons.IrodsConfig) (*IR
 }
 
 func (irods *IRODS) ensureConnected() error {
+	irods.connectionLock.Lock()
+	defer irods.connectionLock.Unlock()
+
 	if irods.fsClient == nil {
 		if time.Now().After(irods.lastConnectTrialTime.Add(commons.ReconnectInterval)) {
 			// passed reconnect interval

@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
@@ -25,6 +26,7 @@ type AMQP struct {
 	channel              *amqp_mod.Channel
 	queue                *amqp_mod.Queue
 	lastConnectTrialTime time.Time
+	connectionLock       sync.Mutex
 	eventHandler         AmqpEventHandler
 }
 
@@ -40,6 +42,7 @@ func CreateAmqp(service *AsyncExecCmdService, config *commons.AmqpConfig, hander
 		service:              service,
 		config:               config,
 		lastConnectTrialTime: time.Time{},
+		connectionLock:       sync.Mutex{},
 		eventHandler:         hander,
 	}
 
@@ -53,6 +56,9 @@ func CreateAmqp(service *AsyncExecCmdService, config *commons.AmqpConfig, hander
 }
 
 func (amqp *AMQP) ensureConnected() error {
+	amqp.connectionLock.Lock()
+	defer amqp.connectionLock.Unlock()
+
 	if amqp.connection != nil {
 		if amqp.connection.IsClosed() {
 			// clear
