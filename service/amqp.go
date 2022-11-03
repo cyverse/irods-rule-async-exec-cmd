@@ -37,6 +37,8 @@ func CreateAmqp(service *AsyncExecCmdService, config *commons.AmqpConfig, hander
 		"function": "CreateAmqp",
 	})
 
+	defer commons.StackTraceFromPanic(logger)
+
 	// lazy connect
 	amqp := &AMQP{
 		service:              service,
@@ -56,6 +58,14 @@ func CreateAmqp(service *AsyncExecCmdService, config *commons.AmqpConfig, hander
 }
 
 func (amqp *AMQP) ensureConnected() error {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "AMQP",
+		"function": "ensureConnected",
+	})
+
+	defer commons.StackTraceFromPanic(logger)
+
 	amqp.connectionLock.Lock()
 	defer amqp.connectionLock.Unlock()
 
@@ -88,6 +98,8 @@ func (amqp *AMQP) connect() error {
 		"struct":   "AMQP",
 		"function": "connect",
 	})
+
+	defer commons.StackTraceFromPanic(logger)
 
 	logger.Infof("connecting to AMQP %s", amqp.config.URL)
 
@@ -132,19 +144,28 @@ func (amqp *AMQP) connect() error {
 	logger.Infof("connected to AMQP %s", amqp.config.URL)
 
 	go func() {
-		for amqp.connection != nil && !amqp.connection.IsClosed() {
-			msgs, err := amqp.channel.Consume(amqp.queue.Name, "", true, false, false, false, nil)
-			if err != nil {
-				logger.WithError(err).Error("failed to consume a message")
-				return
-			}
+		for amqp.connection != nil {
+			amqp.connectionLock.Lock()
 
-			for msg := range msgs {
-				// pass to handlers registered
-				if amqp.eventHandler != nil {
-					amqp.eventHandler(msg)
+			if amqp.connection != nil && !amqp.connection.IsClosed() {
+				msgs, err := amqp.channel.Consume(amqp.queue.Name, "", true, false, false, false, nil)
+				if err != nil {
+					logger.WithError(err).Error("failed to consume a message")
+					amqp.connectionLock.Unlock()
+					return
+				}
+
+				logger.Debugf("consumed %d messages from AMQP", len(msgs))
+
+				for msg := range msgs {
+					// pass to handlers registered
+					if amqp.eventHandler != nil {
+						amqp.eventHandler(msg)
+					}
 				}
 			}
+
+			amqp.connectionLock.Unlock()
 		}
 	}()
 
@@ -159,15 +180,21 @@ func (amqp *AMQP) Release() {
 		"function": "Release",
 	})
 
+	defer commons.StackTraceFromPanic(logger)
+
 	logger.Infof("trying to disconnect from %s", amqp.config.URL)
 
-	if amqp.queue != nil {
-		amqp.queue = nil
-	}
-
+	// this should be called to break Consume
 	if amqp.channel != nil {
 		amqp.channel.Close()
 		amqp.channel = nil
+	}
+
+	amqp.connectionLock.Lock()
+	defer amqp.connectionLock.Unlock()
+
+	if amqp.queue != nil {
+		amqp.queue = nil
 	}
 
 	if amqp.connection != nil {
@@ -188,6 +215,8 @@ func (amqp *AMQP) ProcessItem(item dropin.DropInItem) error {
 		"function": "ProcessItem",
 	})
 
+	defer commons.StackTraceFromPanic(logger)
+
 	request, ok := item.(*dropin.SendMessageRequest)
 	if !ok {
 		err := fmt.Errorf("failed to convert item to SendMessageRequest")
@@ -200,6 +229,9 @@ func (amqp *AMQP) ProcessItem(item dropin.DropInItem) error {
 		logger.Error(err)
 		return err
 	}
+
+	amqp.connectionLock.Lock()
+	defer amqp.connectionLock.Unlock()
 
 	logger.Debugf("trying to publish an AMQP message with a subject %s", request.Key)
 

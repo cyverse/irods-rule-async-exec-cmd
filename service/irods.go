@@ -31,6 +31,8 @@ func CreateIrods(service *AsyncExecCmdService, config *commons.IrodsConfig) (*IR
 		"function": "CreateIrods",
 	})
 
+	defer commons.StackTraceFromPanic(logger)
+
 	// lazy connect
 	irods := &IRODS{
 		service:              service,
@@ -49,6 +51,14 @@ func CreateIrods(service *AsyncExecCmdService, config *commons.IrodsConfig) (*IR
 }
 
 func (irods *IRODS) ensureConnected() error {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "IRODS",
+		"function": "ensureConnected",
+	})
+
+	defer commons.StackTraceFromPanic(logger)
+
 	irods.connectionLock.Lock()
 	defer irods.connectionLock.Unlock()
 
@@ -71,6 +81,8 @@ func (irods *IRODS) connect() error {
 		"struct":   "IRODS",
 		"function": "connect",
 	})
+
+	defer commons.StackTraceFromPanic(logger)
 
 	logger.Infof("connecting to iRODS host %s:%d, zone %s, user %s", irods.config.Host, irods.config.Port, irods.config.Zone, irods.config.AdminUsername)
 
@@ -101,7 +113,12 @@ func (irods *IRODS) Release() {
 		"function": "Release",
 	})
 
+	defer commons.StackTraceFromPanic(logger)
+
 	logger.Infof("trying to release the iRODS FileSystem Client for %s:%d", irods.config.Host, irods.config.Port)
+
+	irods.connectionLock.Lock()
+	defer irods.connectionLock.Unlock()
 
 	if irods.fsClient != nil {
 		irods.fsClient.Release()
@@ -117,11 +134,16 @@ func (irods *IRODS) SetKeyVal(irodsPath string, key string, val string) error {
 		"function": "SetKeyVal",
 	})
 
+	defer commons.StackTraceFromPanic(logger)
+
 	err := irods.ensureConnected()
 	if err != nil {
 		logger.Error(err)
 		return err
 	}
+
+	irods.connectionLock.Lock()
+	defer irods.connectionLock.Unlock()
 
 	logger.Debugf("trying to set a key/val to an iRODS collection/data-object %s, key: %s", irodsPath, key)
 

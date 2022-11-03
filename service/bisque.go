@@ -30,6 +30,13 @@ type BisQue struct {
 
 // CreateBisque creates a BisQue service object
 func CreateBisque(service *AsyncExecCmdService, config *commons.BisqueConfig) (*BisQue, error) {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"function": "CreateBisque",
+	})
+
+	defer commons.StackTraceFromPanic(logger)
+
 	context := context.Background()
 
 	client := &http.Client{}
@@ -50,6 +57,8 @@ func (bisque *BisQue) Release() {
 		"function": "Release",
 	})
 
+	defer commons.StackTraceFromPanic(logger)
+
 	logger.Infof("trying to release HTTP client")
 
 	if bisque.client != nil {
@@ -65,6 +74,8 @@ func (bisque *BisQue) HandleAmqpEvent(msg amqp_mod.Delivery) {
 		"struct":   "BisQue",
 		"function": "HandleAmqpEvent",
 	})
+
+	defer commons.StackTraceFromPanic(logger)
 
 	if strings.Contains(string(msg.Body), "\r") {
 		logger.Error("body with return in it: %s\n", string(msg.Body))
@@ -93,6 +104,8 @@ func (bisque *BisQue) processAddMessage(msg amqp_mod.Delivery) {
 		"struct":   "BisQue",
 		"function": "processAddMessage",
 	})
+
+	defer commons.StackTraceFromPanic(logger)
 
 	body := map[string]interface{}{}
 	err := json.Unmarshal(msg.Body, &body)
@@ -126,6 +139,8 @@ func (bisque *BisQue) processMoveMessage(msg amqp_mod.Delivery) {
 		"struct":   "BisQue",
 		"function": "processMoveMessage",
 	})
+
+	defer commons.StackTraceFromPanic(logger)
 
 	body := map[string]interface{}{}
 	err := json.Unmarshal(msg.Body, &body)
@@ -190,6 +205,8 @@ func (bisque *BisQue) processRemoveMessage(msg amqp_mod.Delivery) {
 		"struct":   "BisQue",
 		"function": "processRemoveMessage",
 	})
+
+	defer commons.StackTraceFromPanic(logger)
 
 	body := map[string]interface{}{}
 	err := json.Unmarshal(msg.Body, &body)
@@ -265,6 +282,8 @@ func (bisque *BisQue) ProcessLinkBisqueRequest(request *dropin.LinkBisqueRequest
 		"function": "ProcessLinkBisqueRequest",
 	})
 
+	defer commons.StackTraceFromPanic(logger)
+
 	logger.Debugf("trying to send a HTTP request for linking an iRODS object %s", request.IRODSPath)
 
 	if len(request.IRODSPath) == 0 || len(request.IRODSUsername) == 0 {
@@ -338,6 +357,8 @@ func (bisque *BisQue) ProcessRemoveBisqueRequest(request *dropin.RemoveBisqueReq
 		"function": "ProcessRemoveBisqueRequest",
 	})
 
+	defer commons.StackTraceFromPanic(logger)
+
 	logger.Debugf("trying to send a HTTP request for removing an iRODS object %s", request.IRODSPath)
 
 	if len(request.IRODSPath) == 0 || len(request.IRODSUsername) == 0 {
@@ -377,6 +398,8 @@ func (bisque *BisQue) ProcessMoveBisqueRequest(request *dropin.MoveBisqueRequest
 		"struct":   "BisQue",
 		"function": "ProcessMoveBisqueRequest",
 	})
+
+	defer commons.StackTraceFromPanic(logger)
 
 	logger.Debugf("trying to send a HTTP request for moving an iRODS object %s to %s", request.SourceIRODSPath, request.DestIRODSPath)
 
@@ -418,6 +441,14 @@ func (bisque *BisQue) ProcessMoveBisqueRequest(request *dropin.MoveBisqueRequest
 }
 
 func (bisque *BisQue) get(url string, params map[string]string) (string, error) {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "get",
+	})
+
+	defer commons.StackTraceFromPanic(logger)
+
 	req, err := http.NewRequestWithContext(bisque.context, http.MethodGet, url, nil)
 	if err != nil {
 		return "", err
@@ -457,6 +488,14 @@ func (bisque *BisQue) get(url string, params map[string]string) (string, error) 
 }
 
 func (bisque *BisQue) post(url string, params map[string]string, body string) (string, error) {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "post",
+	})
+
+	defer commons.StackTraceFromPanic(logger)
+
 	req, err := http.NewRequestWithContext(bisque.context, http.MethodPost, url, nil)
 	if err != nil {
 		return "", err
@@ -517,6 +556,14 @@ func (bisque *BisQue) isIrodsPathForBisque(irodsPath string) bool {
 }
 
 func (bisque *BisQue) getHomeUser(irodsPath string, defaultUser string) string {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "getHomeUser",
+	})
+
+	defer commons.StackTraceFromPanic(logger)
+
 	zonePrefix := fmt.Sprintf("/%s/", bisque.config.IrodsZone)
 	trashPrefix := fmt.Sprintf("/%s/trash/", bisque.config.IrodsZone)
 	if strings.HasPrefix(irodsPath, trashPrefix) {
