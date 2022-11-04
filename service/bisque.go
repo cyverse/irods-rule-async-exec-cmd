@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -107,23 +106,34 @@ func (bisque *BisQue) processAddMessage(msg amqp_mod.Delivery) {
 
 	defer commons.StackTraceFromPanic(logger)
 
-	body := map[string]interface{}{}
-	err := json.Unmarshal(msg.Body, &body)
+	logger.Debugf("received a message - %s", string(msg.Body))
+
+	msgStruct, err := GetIrodsMsgFromJson(msg.Body)
 	if err != nil {
-		logger.WithError(err).Errorf("failed to parse message body - %s : %v", msg.RoutingKey, string(msg.Body))
+		logger.Error(err)
 		return
 	}
 
-	author := body["author"].(string)
-	path := body["path"].(string)
+	user, _, err := GetIrodsMsgUserZone(msgStruct)
+	if err != nil {
+		logger.Error(err)
+		return
+	}
+
+	path, err := GetIrodsMsgPath(msgStruct)
+	if err != nil {
+		logger.Error(err)
+		return
+	}
+
 	if !bisque.isIrodsPathForBisque(path) {
 		// ignore
-		logger.Debugf("ignoring add message since the iRODS path %s is out of iRODS root path %s", path, bisque.config.IrodsRootPath)
+		logger.Debugf("ignoring the request since the iRODS path %s is out of iRODS root path %s", path, bisque.config.IrodsRootPath)
 		return
 	}
 
 	request := dropin.LinkBisqueRequest{
-		IRODSUsername: bisque.getHomeUser(path, author),
+		IRODSUsername: bisque.getHomeUser(path, user),
 		IRODSPath:     path,
 	}
 	err = bisque.ProcessLinkBisqueRequest(&request)
@@ -142,21 +152,30 @@ func (bisque *BisQue) processMoveMessage(msg amqp_mod.Delivery) {
 
 	defer commons.StackTraceFromPanic(logger)
 
-	body := map[string]interface{}{}
-	err := json.Unmarshal(msg.Body, &body)
+	logger.Debugf("received a message - %s", string(msg.Body))
+
+	msgStruct, err := GetIrodsMsgFromJson(msg.Body)
 	if err != nil {
-		logger.WithError(err).Errorf("failed to parse message body - %s : %v", msg.RoutingKey, string(msg.Body))
+		logger.Error(err)
 		return
 	}
 
-	author := body["author"].(string)
-	oldPath := body["old-path"].(string)
-	newPath := body["new-path"].(string)
+	user, _, err := GetIrodsMsgUserZone(msgStruct)
+	if err != nil {
+		logger.Error(err)
+		return
+	}
+
+	oldPath, newPath, err := GetIrodsMsgOldNewPath(msgStruct)
+	if err != nil {
+		logger.Error(err)
+		return
+	}
 
 	if bisque.isIrodsPathForBisque(oldPath) {
 		if bisque.isIrodsPathForBisque(newPath) {
 			request := dropin.MoveBisqueRequest{
-				IRODSUsername:   bisque.getHomeUser(newPath, author),
+				IRODSUsername:   bisque.getHomeUser(newPath, user),
 				SourceIRODSPath: oldPath,
 				DestIRODSPath:   newPath,
 			}
@@ -168,7 +187,7 @@ func (bisque *BisQue) processMoveMessage(msg amqp_mod.Delivery) {
 			return
 		} else {
 			request := dropin.RemoveBisqueRequest{
-				IRODSUsername: bisque.getHomeUser(oldPath, author),
+				IRODSUsername: bisque.getHomeUser(oldPath, user),
 				IRODSPath:     oldPath,
 			}
 			err = bisque.ProcessRemoveBisqueRequest(&request)
@@ -182,7 +201,7 @@ func (bisque *BisQue) processMoveMessage(msg amqp_mod.Delivery) {
 		if bisque.isIrodsPathForBisque(newPath) {
 			// link
 			request := dropin.LinkBisqueRequest{
-				IRODSUsername: bisque.getHomeUser(newPath, author),
+				IRODSUsername: bisque.getHomeUser(newPath, user),
 				IRODSPath:     newPath,
 			}
 			err = bisque.ProcessLinkBisqueRequest(&request)
@@ -193,7 +212,7 @@ func (bisque *BisQue) processMoveMessage(msg amqp_mod.Delivery) {
 			return
 		} else {
 			// ignore
-			logger.Debugf("ignoring moving message since the iRODS path %s and %s are out of iRODS root path %s", oldPath, newPath, bisque.config.IrodsRootPath)
+			logger.Debugf("ignoring the request since the iRODS path %s and %s are out of iRODS root path %s", oldPath, newPath, bisque.config.IrodsRootPath)
 			return
 		}
 	}
@@ -208,23 +227,28 @@ func (bisque *BisQue) processRemoveMessage(msg amqp_mod.Delivery) {
 
 	defer commons.StackTraceFromPanic(logger)
 
-	body := map[string]interface{}{}
-	err := json.Unmarshal(msg.Body, &body)
+	logger.Debugf("received a message - %s", string(msg.Body))
+
+	msgStruct, err := GetIrodsMsgFromJson(msg.Body)
 	if err != nil {
-		logger.WithError(err).Errorf("failed to parse message body - %s : %v", msg.RoutingKey, string(msg.Body))
+		logger.Error(err)
 		return
 	}
 
-	author := body["author"].(string)
-	path := body["path"].(string)
-	if !bisque.isIrodsPathForBisque(path) {
-		// ignore
-		logger.Debugf("ignoring remove message since the iRODS path %s is out of iRODS root path %s", path, bisque.config.IrodsRootPath)
+	user, _, err := GetIrodsMsgUserZone(msgStruct)
+	if err != nil {
+		logger.Error(err)
+		return
+	}
+
+	path, err := GetIrodsMsgPath(msgStruct)
+	if err != nil {
+		logger.Error(err)
 		return
 	}
 
 	request := dropin.RemoveBisqueRequest{
-		IRODSUsername: author,
+		IRODSUsername: user,
 		IRODSPath:     path,
 	}
 	err = bisque.ProcessRemoveBisqueRequest(&request)
