@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
 )
 
 type DropInRequestType string
@@ -21,7 +20,6 @@ type DropInItem interface {
 	GetRequestType() DropInRequestType
 	GetItemFilePath() string
 	SetItemFilePath(path string)
-	DeleteItemFile() error
 	MarshalJson() ([]byte, error)
 	SaveToFile(path string) error
 }
@@ -64,6 +62,10 @@ func NewDropInRequest(bytes []byte) (DropInItem, error) {
 			return NewSendMessageRequestFromBytes(bytes)
 		case LinkBisqueRequestType:
 			return NewLinkBisqueRequestFromBytes(bytes)
+		case RemoveBisqueRequestType:
+			return NewRemoveBisqueRequestFromBytes(bytes)
+		case MoveBisqueRequestType:
+			return NewMoveBisqueRequestFromBytes(bytes)
 		default:
 			return nil, fmt.Errorf("unknown request type - %s", reqTypeString)
 		}
@@ -109,14 +111,6 @@ func (request *SendMessageRequest) GetItemFilePath() string {
 
 func (request *SendMessageRequest) SetItemFilePath(path string) {
 	request.FilePath = path
-}
-
-func (request *SendMessageRequest) DeleteItemFile() error {
-	if len(request.FilePath) == 0 {
-		return fmt.Errorf("file path of the drop-in item is empty")
-	}
-
-	return os.Remove(request.FilePath)
 }
 
 func (request *SendMessageRequest) MarshalJson() ([]byte, error) {
@@ -171,14 +165,6 @@ func (request *LinkBisqueRequest) SetItemFilePath(path string) {
 	request.FilePath = path
 }
 
-func (request *LinkBisqueRequest) DeleteItemFile() error {
-	if len(request.FilePath) == 0 {
-		return fmt.Errorf("file path of the drop-in item is empty")
-	}
-
-	return os.Remove(request.FilePath)
-}
-
 func (request *LinkBisqueRequest) MarshalJson() ([]byte, error) {
 	return json.Marshal(request)
 }
@@ -229,14 +215,6 @@ func (request *RemoveBisqueRequest) GetItemFilePath() string {
 
 func (request *RemoveBisqueRequest) SetItemFilePath(path string) {
 	request.FilePath = path
-}
-
-func (request *RemoveBisqueRequest) DeleteItemFile() error {
-	if len(request.FilePath) == 0 {
-		return fmt.Errorf("file path of the drop-in item is empty")
-	}
-
-	return os.Remove(request.FilePath)
 }
 
 func (request *RemoveBisqueRequest) MarshalJson() ([]byte, error) {
@@ -291,14 +269,6 @@ func (request *MoveBisqueRequest) GetItemFilePath() string {
 
 func (request *MoveBisqueRequest) SetItemFilePath(path string) {
 	request.FilePath = path
-}
-
-func (request *MoveBisqueRequest) DeleteItemFile() error {
-	if len(request.FilePath) == 0 {
-		return fmt.Errorf("file path of the drop-in item is empty")
-	}
-
-	return os.Remove(request.FilePath)
 }
 
 func (request *MoveBisqueRequest) MarshalJson() ([]byte, error) {

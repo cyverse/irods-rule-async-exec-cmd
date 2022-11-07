@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
@@ -129,7 +128,7 @@ func (svc *AsyncExecCmdService) Scrape() {
 		"function": "Scrape",
 	})
 
-	logger.Debugf("checking drop-ins in %s", svc.config.DropInDirPath)
+	//logger.Debugf("checking drop-ins in %s", svc.config.DropInDirPath)
 	items, err := svc.dropin.Scrape()
 	if err != nil {
 		logger.Error(err)
@@ -139,32 +138,26 @@ func (svc *AsyncExecCmdService) Scrape() {
 	if len(items) > 0 {
 		logger.Debugf("found %d drop-ins in %s", len(items), svc.config.DropInDirPath)
 
-		wg := sync.WaitGroup{}
-		for _, item := range items {
-			// process items async.
-			wg.Add(1)
+		for itemIdx, item := range items {
+			logger.Debugf("Processing a drop-in item %d", itemIdx)
+			err = svc.ProcessItem(item)
+			if err != nil {
+				logger.WithError(err).Errorf("failed to process drop-in %s", item.GetRequestType())
+				svc.dropin.MarkFailed(item)
+				return
+			}
 
-			go func(item dropin.DropInItem, wg *sync.WaitGroup) {
-				defer wg.Done()
+			logger.Debugf("Processed a drop-in item %d", itemIdx)
 
-				err = svc.ProcessItem(item)
+			if len(item.GetItemFilePath()) > 0 {
+				// processed -> delete file
+				err = svc.dropin.MarkSuccess(item)
 				if err != nil {
-					logger.WithError(err).Errorf("failed to process drop-in %s", item.GetRequestType())
+					logger.WithError(err).Errorf("failed to mark drop-in %s success", item.GetRequestType())
 					return
 				}
-
-				if len(item.GetItemFilePath()) > 0 {
-					// processed -> delete file
-					err = item.DeleteItemFile()
-					if err != nil {
-						logger.WithError(err).Errorf("failed to delete drop-in %s", item.GetRequestType())
-						return
-					}
-				}
-			}(item, &wg)
+			}
 		}
-
-		wg.Wait()
 	}
 }
 
@@ -179,6 +172,7 @@ func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) error {
 	case dropin.SendMessageRequestType:
 		processed := false
 		if svc.amqp != nil {
+			logger.Debug("Processing an AMQP request")
 			err := svc.amqp.ProcessItem(item)
 			if err != nil {
 				logger.Error(err)
@@ -194,6 +188,7 @@ func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) error {
 	case dropin.LinkBisqueRequestType, dropin.RemoveBisqueRequestType, dropin.MoveBisqueRequestType:
 		processed := false
 		if svc.bisque != nil {
+			logger.Debug("Processing a BisQue request")
 			err := svc.bisque.ProcessItem(item)
 			if err != nil {
 				logger.Error(err)

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -11,18 +12,20 @@ import (
 
 // DropIn is a struct to maintain drop in config and state
 type DropIn struct {
-	Dir string
+	Dir       string
+	FailedDir string
 }
 
 func NewDropIn(dir string) *DropIn {
 	return &DropIn{
-		Dir: dir,
+		Dir:       dir,
+		FailedDir: path.Join(dir, "failed"),
 	}
 }
 
 // MakeDropInDir makes drop in dir
 func (dropin *DropIn) MakeDropInDir() error {
-	dirInfo, err := os.Stat(dropin.Dir)
+	dropinDirInfo, err := os.Stat(dropin.Dir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			// make
@@ -31,19 +34,47 @@ func (dropin *DropIn) MakeDropInDir() error {
 				return fmt.Errorf("making a drop in dir (%s) error - %v", dropin.Dir, mkdirErr)
 			}
 
-			return nil
+			// okay
+		} else {
+			return fmt.Errorf("drop in dir (%s) error - %v", dropin.Dir, err)
+		}
+	}
+
+	if dropinDirInfo != nil {
+		if !dropinDirInfo.IsDir() {
+			return fmt.Errorf("drop in dir (%s) exist, but not a directory", dropin.Dir)
 		}
 
-		return fmt.Errorf("drop in dir (%s) error - %v", dropin.Dir, err)
+		dropinDirPerm := dropinDirInfo.Mode().Perm()
+		if dropinDirPerm&0200 != 0200 {
+			return fmt.Errorf("drop in dir (%s) exist, but does not have write permission", dropin.Dir)
+		}
 	}
 
-	if !dirInfo.IsDir() {
-		return fmt.Errorf("drop in dir (%s) exist, but not a directory", dropin.Dir)
+	failedDropinDirInfo, err := os.Stat(dropin.FailedDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// make
+			mkdirErr := os.MkdirAll(dropin.FailedDir, 0775)
+			if mkdirErr != nil {
+				return fmt.Errorf("making a failed drop in dir (%s) error - %v", dropin.FailedDir, mkdirErr)
+			}
+
+			// okay
+		} else {
+			return fmt.Errorf("failed drop in dir (%s) error - %v", dropin.FailedDir, err)
+		}
 	}
 
-	tempDirPerm := dirInfo.Mode().Perm()
-	if tempDirPerm&0200 != 0200 {
-		return fmt.Errorf("drop in dir (%s) exist, but does not have write permission", dropin.Dir)
+	if failedDropinDirInfo != nil {
+		if !failedDropinDirInfo.IsDir() {
+			return fmt.Errorf("failed drop in dir (%s) exist, but not a directory", dropin.FailedDir)
+		}
+
+		failedDropinDirPerm := failedDropinDirInfo.Mode().Perm()
+		if failedDropinDirPerm&0200 != 0200 {
+			return fmt.Errorf("failed drop in dir (%s) exist, but does not have write permission", dropin.FailedDir)
+		}
 	}
 
 	return nil
@@ -67,15 +98,38 @@ func (dropin *DropIn) Scrape() ([]DropInItem, error) {
 
 	items := []DropInItem{}
 	for _, file := range files {
-		fullpath := filepath.Join(dropin.Dir, file.Name())
-		item, reqErr := NewDropInRequestFromFile(fullpath)
-		if reqErr != nil {
-			err = reqErr
-			continue
-		}
+		if !file.IsDir() {
+			fullpath := filepath.Join(dropin.Dir, file.Name())
+			item, reqErr := NewDropInRequestFromFile(fullpath)
+			if reqErr != nil {
+				err = reqErr
+				failDirFile := filepath.Join(dropin.FailedDir, filepath.Base(fullpath))
+				os.Rename(fullpath, failDirFile)
+				continue
+			}
 
-		items = append(items, item)
+			items = append(items, item)
+		}
 	}
 
 	return items, err
+}
+
+// MarkFailed sets a drip-in failed
+func (dropin *DropIn) MarkFailed(item DropInItem) error {
+	fullpath := item.GetItemFilePath()
+	if len(fullpath) > 0 {
+		failDirFile := filepath.Join(dropin.FailedDir, filepath.Base(fullpath))
+		return os.Rename(fullpath, failDirFile)
+	}
+	return nil
+}
+
+// MarkSuccess sets a drip-in success
+func (dropin *DropIn) MarkSuccess(item DropInItem) error {
+	fullpath := item.GetItemFilePath()
+	if len(fullpath) > 0 {
+		return os.Remove(fullpath)
+	}
+	return nil
 }

@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	AMQPConsumerQueueName string = "irods_rule_async_exec_cmd"
+	AMQPConsumerQueueName string        = "irods_rule_async_exec_cmd"
+	AMQPConsumeInterval   time.Duration = 1 * time.Second
 )
 
 type AmqpEventHandler func(msg amqp_mod.Delivery)
@@ -124,7 +125,7 @@ func (amqp *AMQP) connect() error {
 	quename := amqp.getQueueName()
 	logger.Infof("Declaring a queue %s", quename)
 
-	queue, err := channel.QueueDeclare(quename, false, true, false, false, amqp_mod.Table{})
+	queue, err := channel.QueueDeclare(quename, false, true, true, false, amqp_mod.Table{})
 	if err != nil {
 		logger.WithError(err).Errorf("failed to declare a queue")
 		return err
@@ -148,24 +149,24 @@ func (amqp *AMQP) connect() error {
 			amqp.connectionLock.Lock()
 
 			if amqp.connection != nil && !amqp.connection.IsClosed() {
+				amqp.connectionLock.Unlock()
+
 				msgs, err := amqp.channel.Consume(amqp.queue.Name, "", true, false, false, false, nil)
 				if err != nil {
 					logger.WithError(err).Error("failed to consume a message")
-					amqp.connectionLock.Unlock()
 					return
 				}
 
-				logger.Debugf("consumed %d messages from AMQP", len(msgs))
-
 				for msg := range msgs {
+					logger.Debugf("consumed a message %s from AMQP", msg.RoutingKey)
 					// pass to handlers registered
 					if amqp.eventHandler != nil {
 						amqp.eventHandler(msg)
 					}
 				}
+			} else {
+				amqp.connectionLock.Unlock()
 			}
-
-			amqp.connectionLock.Unlock()
 		}
 	}()
 
