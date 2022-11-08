@@ -83,13 +83,13 @@ func (bisque *BisQue) HandleAmqpEvent(msg amqp_mod.Delivery) {
 
 	switch msg.RoutingKey {
 	case "data-object.add":
-		bisque.processAddMessage(msg)
+		bisque.processAmqpAddMessage(msg)
 		return
 	case "data-object.mv":
-		bisque.processMoveMessage(msg)
+		bisque.processAmqpMoveMessage(msg)
 		return
 	case "data-object.rm":
-		bisque.processRemoveMessage(msg)
+		bisque.processAmqpRemoveMessage(msg)
 		return
 	default:
 		// event is not interested
@@ -97,11 +97,11 @@ func (bisque *BisQue) HandleAmqpEvent(msg amqp_mod.Delivery) {
 	}
 }
 
-func (bisque *BisQue) processAddMessage(msg amqp_mod.Delivery) {
+func (bisque *BisQue) processAmqpAddMessage(msg amqp_mod.Delivery) {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "BisQue",
-		"function": "processAddMessage",
+		"function": "processAmqpAddMessage",
 	})
 
 	defer commons.StackTraceFromPanic(logger)
@@ -132,22 +132,23 @@ func (bisque *BisQue) processAddMessage(msg amqp_mod.Delivery) {
 		return
 	}
 
-	request := dropin.LinkBisqueRequest{
-		IRODSUsername: bisque.getHomeUser(path, user),
-		IRODSPath:     path,
-	}
-	err = bisque.ProcessLinkBisqueRequest(&request)
+	bisqueUser := bisque.getHomeUser(path, user)
+
+	logger.Debugf("drop a link bisque request %s, %s", bisqueUser, path)
+
+	request := dropin.NewLinkBisqueRequest(bisqueUser, path)
+	err = bisque.service.dropin.Drop(request)
 	if err != nil {
-		logger.WithError(err).Errorf("failed to process a message - %s", msg.RoutingKey)
+		logger.WithError(err).Errorf("failed to drop a link bisque request - %s, %s", bisqueUser, path)
 		return
 	}
 }
 
-func (bisque *BisQue) processMoveMessage(msg amqp_mod.Delivery) {
+func (bisque *BisQue) processAmqpMoveMessage(msg amqp_mod.Delivery) {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "BisQue",
-		"function": "processMoveMessage",
+		"function": "processAmqpMoveMessage",
 	})
 
 	defer commons.StackTraceFromPanic(logger)
@@ -174,25 +175,28 @@ func (bisque *BisQue) processMoveMessage(msg amqp_mod.Delivery) {
 
 	if bisque.isIrodsPathForBisque(oldPath) {
 		if bisque.isIrodsPathForBisque(newPath) {
-			request := dropin.MoveBisqueRequest{
-				IRODSUsername:   bisque.getHomeUser(newPath, user),
-				SourceIRODSPath: oldPath,
-				DestIRODSPath:   newPath,
-			}
-			err = bisque.ProcessMoveBisqueRequest(&request)
+			// move
+			bisqueUser := bisque.getHomeUser(newPath, user)
+
+			logger.Debugf("drop a move bisque request %s, %s to %s", bisqueUser, oldPath, newPath)
+
+			request := dropin.NewMoveBisqueRequest(bisqueUser, oldPath, newPath)
+			err = bisque.service.dropin.Drop(request)
 			if err != nil {
-				logger.WithError(err).Errorf("failed to process a message - %s", msg.RoutingKey)
+				logger.WithError(err).Errorf("failed to drop a move bisque request - %s, %s, %s", bisqueUser, oldPath, newPath)
 				return
 			}
 			return
 		} else {
-			request := dropin.RemoveBisqueRequest{
-				IRODSUsername: bisque.getHomeUser(oldPath, user),
-				IRODSPath:     oldPath,
-			}
-			err = bisque.ProcessRemoveBisqueRequest(&request)
+			// remove
+			bisqueUser := bisque.getHomeUser(oldPath, user)
+
+			logger.Debugf("drop a remove bisque request %s, %s", bisqueUser, oldPath)
+
+			request := dropin.NewRemoveBisqueRequest(bisqueUser, oldPath)
+			err = bisque.service.dropin.Drop(request)
 			if err != nil {
-				logger.WithError(err).Errorf("failed to process a message - %s", msg.RoutingKey)
+				logger.WithError(err).Errorf("failed to drop a remove bisque request - %s, %s", bisqueUser, oldPath)
 				return
 			}
 			return
@@ -200,13 +204,14 @@ func (bisque *BisQue) processMoveMessage(msg amqp_mod.Delivery) {
 	} else {
 		if bisque.isIrodsPathForBisque(newPath) {
 			// link
-			request := dropin.LinkBisqueRequest{
-				IRODSUsername: bisque.getHomeUser(newPath, user),
-				IRODSPath:     newPath,
-			}
-			err = bisque.ProcessLinkBisqueRequest(&request)
+			bisqueUser := bisque.getHomeUser(newPath, user)
+
+			logger.Debugf("drop a link bisque request %s, %s", bisqueUser, newPath)
+
+			request := dropin.NewRemoveBisqueRequest(bisqueUser, oldPath)
+			err = bisque.service.dropin.Drop(request)
 			if err != nil {
-				logger.WithError(err).Errorf("failed to process a message - %s", msg.RoutingKey)
+				logger.WithError(err).Errorf("failed to drop a link bisque request - %s, %s", bisqueUser, newPath)
 				return
 			}
 			return
@@ -218,11 +223,11 @@ func (bisque *BisQue) processMoveMessage(msg amqp_mod.Delivery) {
 	}
 }
 
-func (bisque *BisQue) processRemoveMessage(msg amqp_mod.Delivery) {
+func (bisque *BisQue) processAmqpRemoveMessage(msg amqp_mod.Delivery) {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "BisQue",
-		"function": "processRemoveMessage",
+		"function": "processAmqpRemoveMessage",
 	})
 
 	defer commons.StackTraceFromPanic(logger)
@@ -247,13 +252,14 @@ func (bisque *BisQue) processRemoveMessage(msg amqp_mod.Delivery) {
 		return
 	}
 
-	request := dropin.RemoveBisqueRequest{
-		IRODSUsername: user,
-		IRODSPath:     path,
-	}
-	err = bisque.ProcessRemoveBisqueRequest(&request)
+	bisqueUser := bisque.getHomeUser(path, user)
+
+	logger.Debugf("drop a remove bisque request %s, %s", bisqueUser, path)
+
+	request := dropin.NewRemoveBisqueRequest(bisqueUser, path)
+	err = bisque.service.dropin.Drop(request)
 	if err != nil {
-		logger.WithError(err).Errorf("failed to process a message - %s", msg.RoutingKey)
+		logger.WithError(err).Errorf("failed to drop a remove bisque request - %s, %s", bisqueUser, path)
 		return
 	}
 }

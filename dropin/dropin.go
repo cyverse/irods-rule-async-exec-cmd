@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -111,6 +112,13 @@ func (dropin *DropIn) Scrape() ([]DropInItem, error) {
 			items = append(items, item)
 		}
 	}
+
+	// sort by file name
+	sort.SliceStable(items[:], func(i int, j int) bool {
+		basei := filepath.Base(items[i].GetItemFilePath())
+		basej := filepath.Base(items[j].GetItemFilePath())
+		return basei < basej
+	})
 
 	return items, err
 }

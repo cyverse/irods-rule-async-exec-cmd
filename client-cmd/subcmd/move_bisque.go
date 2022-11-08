@@ -76,7 +76,6 @@ func dropMoveBisqueRequestOne(config *commons.ClientConfig, irodsUsername string
 	logger.Debugf("drop a move bisque request %s, %s to %s", irodsUsername, irodsSourcePath, irodsDestPath)
 
 	request := dropin.NewMoveBisqueRequest(irodsUsername, irodsSourcePath, irodsDestPath)
-
 	err := di.Drop(request)
 	if err != nil {
 		logger.Error(err)

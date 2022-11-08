@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"time"
 )
 
 type DropInRequestType string
@@ -18,16 +19,19 @@ const (
 // DropInItem is an interface that all drop-in items must implement
 type DropInItem interface {
 	GetRequestType() DropInRequestType
+	GetCreationTime() time.Time
 	GetItemFilePath() string
 	SetItemFilePath(path string)
 	MarshalJson() ([]byte, error)
+	ToString() string
 	SaveToFile(path string) error
 }
 
 // DropInItemBase is a common parts that all drop-in items must contain
 type DropInItemBase struct {
-	Type     DropInRequestType `json:"type"` // requred to identify what this item is
-	FilePath string            `json:"-"`    // stores physical path of item, to be filled when the item is drop-in
+	Type         DropInRequestType `json:"type"`          // requred to identify what this item is
+	CreationTime time.Time         `json:"creation_time"` // creation time
+	FilePath     string            `json:"-"`             // stores physical path of item, to be filled when the item is drop-in
 }
 
 // NewDropInRequestFromFile creates DropInItem from a file
@@ -84,7 +88,8 @@ type SendMessageRequest struct {
 func NewSendMessageRequest(key string, body string) *SendMessageRequest {
 	return &SendMessageRequest{
 		DropInItemBase: DropInItemBase{
-			Type: SendMessageRequestType,
+			Type:         SendMessageRequestType,
+			CreationTime: time.Now().Local(),
 		},
 		Key:  key,
 		Body: body,
@@ -103,6 +108,10 @@ func NewSendMessageRequestFromBytes(bytes []byte) (*SendMessageRequest, error) {
 
 func (request *SendMessageRequest) GetRequestType() DropInRequestType {
 	return request.Type
+}
+
+func (request *SendMessageRequest) GetCreationTime() time.Time {
+	return request.CreationTime
 }
 
 func (request *SendMessageRequest) GetItemFilePath() string {
@@ -126,6 +135,10 @@ func (request *SendMessageRequest) SaveToFile(path string) error {
 	return ioutil.WriteFile(path, bytes, 0o666)
 }
 
+func (request *SendMessageRequest) ToString() string {
+	return fmt.Sprintf("send message request - key: '%s', body: '\n%s\n', timestamp: %s", request.Key, request.Body, request.CreationTime.String())
+}
+
 type LinkBisqueRequest struct {
 	DropInItemBase
 
@@ -136,7 +149,8 @@ type LinkBisqueRequest struct {
 func NewLinkBisqueRequest(irodsUsername string, irodsPath string) *LinkBisqueRequest {
 	return &LinkBisqueRequest{
 		DropInItemBase: DropInItemBase{
-			Type: LinkBisqueRequestType,
+			Type:         LinkBisqueRequestType,
+			CreationTime: time.Now().Local(),
 		},
 		IRODSUsername: irodsUsername,
 		IRODSPath:     irodsPath,
@@ -155,6 +169,10 @@ func NewLinkBisqueRequestFromBytes(bytes []byte) (*LinkBisqueRequest, error) {
 
 func (request *LinkBisqueRequest) GetRequestType() DropInRequestType {
 	return request.Type
+}
+
+func (request *LinkBisqueRequest) GetCreationTime() time.Time {
+	return request.CreationTime
 }
 
 func (request *LinkBisqueRequest) GetItemFilePath() string {
@@ -178,6 +196,10 @@ func (request *LinkBisqueRequest) SaveToFile(path string) error {
 	return ioutil.WriteFile(path, bytes, 0o666)
 }
 
+func (request *LinkBisqueRequest) ToString() string {
+	return fmt.Sprintf("link bisque request - irods user: '%s', irods path: '%s', timestamp: %s", request.IRODSUsername, request.IRODSPath, request.CreationTime.String())
+}
+
 type RemoveBisqueRequest struct {
 	DropInItemBase
 
@@ -188,7 +210,8 @@ type RemoveBisqueRequest struct {
 func NewRemoveBisqueRequest(irodsUsername string, irodsPath string) *RemoveBisqueRequest {
 	return &RemoveBisqueRequest{
 		DropInItemBase: DropInItemBase{
-			Type: RemoveBisqueRequestType,
+			Type:         RemoveBisqueRequestType,
+			CreationTime: time.Now().Local(),
 		},
 		IRODSUsername: irodsUsername,
 		IRODSPath:     irodsPath,
@@ -207,6 +230,10 @@ func NewRemoveBisqueRequestFromBytes(bytes []byte) (*RemoveBisqueRequest, error)
 
 func (request *RemoveBisqueRequest) GetRequestType() DropInRequestType {
 	return request.Type
+}
+
+func (request *RemoveBisqueRequest) GetCreationTime() time.Time {
+	return request.CreationTime
 }
 
 func (request *RemoveBisqueRequest) GetItemFilePath() string {
@@ -230,6 +257,10 @@ func (request *RemoveBisqueRequest) SaveToFile(path string) error {
 	return ioutil.WriteFile(path, bytes, 0o666)
 }
 
+func (request *RemoveBisqueRequest) ToString() string {
+	return fmt.Sprintf("remove bisque request - irods user: '%s', irods path: '%s', timestamp: %s", request.IRODSUsername, request.IRODSPath, request.CreationTime.String())
+}
+
 type MoveBisqueRequest struct {
 	DropInItemBase
 
@@ -241,7 +272,8 @@ type MoveBisqueRequest struct {
 func NewMoveBisqueRequest(irodsUsername string, sourceIrodsPath string, destIrodsPath string) *MoveBisqueRequest {
 	return &MoveBisqueRequest{
 		DropInItemBase: DropInItemBase{
-			Type: MoveBisqueRequestType,
+			Type:         MoveBisqueRequestType,
+			CreationTime: time.Now().Local(),
 		},
 		IRODSUsername:   irodsUsername,
 		SourceIRODSPath: sourceIrodsPath,
@@ -263,6 +295,10 @@ func (request *MoveBisqueRequest) GetRequestType() DropInRequestType {
 	return request.Type
 }
 
+func (request *MoveBisqueRequest) GetCreationTime() time.Time {
+	return request.CreationTime
+}
+
 func (request *MoveBisqueRequest) GetItemFilePath() string {
 	return request.FilePath
 }
@@ -282,4 +318,8 @@ func (request *MoveBisqueRequest) SaveToFile(path string) error {
 	}
 
 	return ioutil.WriteFile(path, bytes, 0o666)
+}
+
+func (request *MoveBisqueRequest) ToString() string {
+	return fmt.Sprintf("move bisque request - irods user: '%s', source irods path: '%s', dest irods path: '%s', timestamp: %s", request.IRODSUsername, request.SourceIRODSPath, request.DestIRODSPath, request.CreationTime.String())
 }

@@ -71,10 +71,9 @@ func dropLinkBisqueRequestOne(config *commons.ClientConfig, irodsUsername string
 
 	di := dropin.NewDropIn(config.DropInDirPath)
 
-	logger.Debugf("drop a link bisque request %s, %s", irodsUsername, irodsPath)
+	logger.Debugf("drop a link bisque request %s", irodsUsername, irodsPath)
 
 	request := dropin.NewLinkBisqueRequest(irodsUsername, irodsPath)
-
 	err := di.Drop(request)
 	if err != nil {
 		logger.Error(err)

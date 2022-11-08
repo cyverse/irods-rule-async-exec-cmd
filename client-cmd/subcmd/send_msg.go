@@ -74,7 +74,6 @@ func dropSendMessageRequestOne(config *commons.ClientConfig, key string, body st
 	logger.Debugf("drop a send message request %s", key)
 
 	request := dropin.NewSendMessageRequest(key, body)
-
 	err := di.Drop(request)
 	if err != nil {
 		logger.Error(err)

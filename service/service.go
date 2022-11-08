@@ -144,17 +144,15 @@ func (svc *AsyncExecCmdService) Scrape() {
 			if err != nil {
 				logger.WithError(err).Errorf("failed to process drop-in %s", item.GetRequestType())
 				svc.dropin.MarkFailed(item)
-				return
-			}
+			} else {
+				logger.Debugf("Processed a drop-in item %d", itemIdx)
 
-			logger.Debugf("Processed a drop-in item %d", itemIdx)
-
-			if len(item.GetItemFilePath()) > 0 {
-				// processed -> delete file
-				err = svc.dropin.MarkSuccess(item)
-				if err != nil {
-					logger.WithError(err).Errorf("failed to mark drop-in %s success", item.GetRequestType())
-					return
+				if len(item.GetItemFilePath()) > 0 {
+					// processed -> delete file
+					err = svc.dropin.MarkSuccess(item)
+					if err != nil {
+						logger.WithError(err).Errorf("failed to mark drop-in %s success", item.GetRequestType())
+					}
 				}
 			}
 		}
