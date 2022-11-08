@@ -592,14 +592,14 @@ func (bisque *BisQue) getHomeUser(irodsPath string, defaultUser string) string {
 	trashPrefix := fmt.Sprintf("/%s/trash/", bisque.config.IrodsZone)
 	if strings.HasPrefix(irodsPath, trashPrefix) {
 		// starts with /trash/zone/
-		rest := bisque.config.IrodsZone[len(trashPrefix):]
+		rest := irodsPath[len(trashPrefix):]
 		if len(rest) > 0 {
 			paths := strings.Split(rest, "/")
 			return paths[0]
 		}
 	} else if strings.HasPrefix(irodsPath, zonePrefix) {
 		// starts with /zone/
-		rest := bisque.config.IrodsZone[len(zonePrefix):]
+		rest := irodsPath[len(zonePrefix):]
 		if len(rest) > 0 {
 			paths := strings.Split(rest, "/")
 			return paths[0]
