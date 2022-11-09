@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
@@ -138,39 +139,83 @@ func (svc *AsyncExecCmdService) Scrape() {
 	if len(items) > 0 {
 		logger.Debugf("found %d drop-ins in %s", len(items), svc.config.DropInDirPath)
 
-		for itemIdx, item := range items {
-			logger.Debugf("Processing a drop-in item %d", itemIdx)
-			err = svc.ProcessItem(item)
-			if err != nil {
-				logger.WithError(err).Errorf("failed to process drop-in %s", item.GetRequestType())
-				svc.dropin.MarkFailed(item)
-			} else {
-				logger.Debugf("Processed a drop-in item %d", itemIdx)
+		messageChan := make(chan dropin.DropInItem)
+		bisqueChan := make(chan dropin.DropInItem)
 
-				if len(item.GetItemFilePath()) > 0 {
-					// processed -> delete file
-					err = svc.dropin.MarkSuccess(item)
-					if err != nil {
-						logger.WithError(err).Errorf("failed to mark drop-in %s success", item.GetRequestType())
-					}
-				}
+		wg := sync.WaitGroup{}
+		wg.Add(2)
+
+		// we create two goroutines to handle them separately in parallel
+		go func() {
+			for item := range messageChan {
+				svc.ProcessItem(item)
+			}
+			wg.Done()
+		}()
+
+		go func() {
+			for item := range bisqueChan {
+				svc.ProcessItem(item)
+			}
+			wg.Done()
+		}()
+
+		for _, item := range items {
+			if dropin.IsItemTypeSendMessage(item) {
+				logger.Debug("sending a drop-in to send_message queue")
+				messageChan <- item
+			} else if dropin.IsItemTypeBisque(item) {
+				logger.Debug("sending a drop-in to bisque queue")
+				bisqueChan <- item
+			} else {
+				logger.Debug("unknown drop-in found, skip")
 			}
 		}
+
+		close(messageChan)
+		close(bisqueChan)
+
+		wg.Wait()
 	}
 }
 
-func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) error {
+func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "AsyncExecCmdService",
 		"function": "ProcessItem",
 	})
 
+	logger.Debug("Processing a drop-in item")
+	err := svc.distributeItem(item)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to process drop-in %s", item.GetRequestType())
+		svc.dropin.MarkFailed(item)
+	} else {
+		logger.Debugf("Processed a drop-in item")
+
+		if len(item.GetItemFilePath()) > 0 {
+			// processed -> delete file
+			err = svc.dropin.MarkSuccess(item)
+			if err != nil {
+				logger.WithError(err).Errorf("failed to mark drop-in %s success", item.GetRequestType())
+			}
+		}
+	}
+}
+
+func (svc *AsyncExecCmdService) distributeItem(item dropin.DropInItem) error {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "AsyncExecCmdService",
+		"function": "distributeItem",
+	})
+
 	switch item.GetRequestType() {
 	case dropin.SendMessageRequestType:
 		processed := false
 		if svc.amqp != nil {
-			logger.Debug("Processing an AMQP request")
+			logger.Debug("Sending an AMQP request")
 			err := svc.amqp.ProcessItem(item)
 			if err != nil {
 				logger.Error(err)
@@ -181,12 +226,12 @@ func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) error {
 		}
 
 		if !processed {
-			return fmt.Errorf("failed to process send_message request because AMQP is not configured")
+			return fmt.Errorf("failed to send a send_message request because AMQP is not configured")
 		}
 	case dropin.LinkBisqueRequestType, dropin.RemoveBisqueRequestType, dropin.MoveBisqueRequestType:
 		processed := false
 		if svc.bisque != nil {
-			logger.Debug("Processing a BisQue request")
+			logger.Debug("Sending a BisQue request")
 			err := svc.bisque.ProcessItem(item)
 			if err != nil {
 				logger.Error(err)
@@ -197,10 +242,10 @@ func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) error {
 		}
 
 		if !processed {
-			return fmt.Errorf("failed to process bisque request because BisQue is not configured")
+			return fmt.Errorf("failed to send a bisque request because BisQue is not configured")
 		}
 	default:
-		return fmt.Errorf("failed to process unknown request %s", item.GetRequestType())
+		return fmt.Errorf("failed to distribute an unknown request %s", item.GetRequestType())
 	}
 
 	return nil
