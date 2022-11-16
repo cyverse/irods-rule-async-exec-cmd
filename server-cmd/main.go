@@ -133,7 +133,7 @@ func childMain(command *cobra.Command, args []string) {
 
 	if err != nil {
 		logger.WithError(err).Error("failed to communicate to parent process")
-		fmt.Fprintln(os.Stderr, cmd_commons.InterProcessCommunicationFinishError)
+		cmd_commons.ReportChildProcessError()
 		os.Exit(1)
 	}
 
