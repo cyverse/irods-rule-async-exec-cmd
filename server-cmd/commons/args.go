@@ -147,6 +147,7 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ServerConfig, io.Write
 	// prioritize command-line flag over config files
 	if debug {
 		log.SetLevel(log.DebugLevel)
+		config.Debug = true
 	}
 
 	if foreground {
@@ -169,10 +170,11 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ServerConfig, io.Write
 	if config.LogPath == "-" || len(config.LogPath) == 0 {
 		log.SetOutput(os.Stderr)
 	} else {
-		logWriter, logFilePath := getLogWriterForParentProcess(config.LogPath)
+		parentLogWriter, logFilePath := getLogWriterForParentProcess(config.LogPath)
+		logWriter = parentLogWriter
 
 		// use multi output - to output to file and stdout
-		mw := io.MultiWriter(os.Stderr, logWriter)
+		mw := io.MultiWriter(os.Stderr, parentLogWriter)
 		log.SetOutput(mw)
 
 		logger.Infof("Logging to %s", logFilePath)
