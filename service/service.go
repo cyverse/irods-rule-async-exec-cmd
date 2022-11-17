@@ -27,12 +27,14 @@ type AsyncExecCmdService struct {
 	terminateChan chan bool
 }
 
-// Start starts a new async exec cmd service
-func Start(config *commons.ServerConfig) (*AsyncExecCmdService, error) {
+// NewService creates a new Service
+func NewService(config *commons.ServerConfig) (*AsyncExecCmdService, error) {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"function": "Start",
 	})
+
+	defer commons.StackTraceFromPanic(logger)
 
 	service := &AsyncExecCmdService{
 		config: config,
@@ -71,6 +73,19 @@ func Start(config *commons.ServerConfig) (*AsyncExecCmdService, error) {
 		return nil, err
 	}
 
+	return service, nil
+}
+
+// Start starts the service
+func (svc *AsyncExecCmdService) Start() error {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "AsyncExecCmdService",
+		"function": "Start",
+	})
+
+	defer commons.StackTraceFromPanic(logger)
+
 	logger.Info("Starting the Async Exec Cmd Service")
 
 	go func() {
@@ -79,20 +94,20 @@ func Start(config *commons.ServerConfig) (*AsyncExecCmdService, error) {
 
 		for {
 			select {
-			case <-service.terminateChan:
+			case <-svc.terminateChan:
 				// terminate
 				return
 			case <-scrapeTicker.C:
-				service.Scrape()
+				svc.Scrape()
 			}
 		}
 	}()
 
-	return service, nil
+	return nil
 }
 
 // Stop stops the service
-func (svc *AsyncExecCmdService) Stop() error {
+func (svc *AsyncExecCmdService) Stop() {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "AsyncExecCmdService",
@@ -100,6 +115,8 @@ func (svc *AsyncExecCmdService) Stop() error {
 	})
 
 	logger.Info("Stopping the Async Exec Cmd Service")
+
+	defer commons.StackTraceFromPanic(logger)
 
 	svc.terminateChan <- true
 
@@ -117,8 +134,6 @@ func (svc *AsyncExecCmdService) Stop() error {
 		svc.irods.Release()
 		svc.irods = nil
 	}
-
-	return nil
 }
 
 // Scrape scrape dropins

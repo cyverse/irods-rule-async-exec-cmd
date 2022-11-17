@@ -168,10 +168,20 @@ func run(config *commons.ServerConfig, isChildProcess bool) error {
 	logger.Infof("iRODS Rule Async Exec Cmd Service version - %s, commit - %s", versionInfo.ReleaseVersion, versionInfo.GitCommit)
 
 	// run a service
-	svc, err := service.Start(config)
+	svc, err := service.NewService(config)
+	if err != nil {
+		logger.WithError(err).Error("failed to create the service")
+		if isChildProcess {
+			cmd_commons.ReportChildProcessError()
+		}
+		return err
+	}
+
+	err = svc.Start()
 	if err != nil {
 		logger.WithError(err).Error("failed to start the service")
 		if isChildProcess {
+			svc.Stop()
 			cmd_commons.ReportChildProcessError()
 		}
 		return err
