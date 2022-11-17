@@ -181,7 +181,6 @@ func run(config *commons.ServerConfig, isChildProcess bool) error {
 	if err != nil {
 		logger.WithError(err).Error("failed to start the service")
 		if isChildProcess {
-			svc.Stop()
 			cmd_commons.ReportChildProcessError()
 		}
 		return err
@@ -195,6 +194,7 @@ func run(config *commons.ServerConfig, isChildProcess bool) error {
 	}
 
 	defer svc.Stop()
+	defer svc.Release()
 
 	// wait
 	waitForCtrlC()

@@ -76,6 +76,34 @@ func NewService(config *commons.ServerConfig) (*AsyncExecCmdService, error) {
 	return service, nil
 }
 
+// Release releases the service
+func (svc *AsyncExecCmdService) Release() {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "AsyncExecCmdService",
+		"function": "Release",
+	})
+
+	logger.Info("Releasing the Async Exec Cmd Service")
+
+	defer commons.StackTraceFromPanic(logger)
+
+	if svc.amqp != nil {
+		svc.amqp.Release()
+		svc.amqp = nil
+	}
+
+	if svc.bisque != nil {
+		svc.bisque.Release()
+		svc.bisque = nil
+	}
+
+	if svc.irods != nil {
+		svc.irods.Release()
+		svc.irods = nil
+	}
+}
+
 // Start starts the service
 func (svc *AsyncExecCmdService) Start() error {
 	logger := log.WithFields(log.Fields{
@@ -119,21 +147,6 @@ func (svc *AsyncExecCmdService) Stop() {
 	defer commons.StackTraceFromPanic(logger)
 
 	svc.terminateChan <- true
-
-	if svc.amqp != nil {
-		svc.amqp.Release()
-		svc.amqp = nil
-	}
-
-	if svc.bisque != nil {
-		svc.bisque.Release()
-		svc.bisque = nil
-	}
-
-	if svc.irods != nil {
-		svc.irods.Release()
-		svc.irods = nil
-	}
 }
 
 // Scrape scrape dropins
