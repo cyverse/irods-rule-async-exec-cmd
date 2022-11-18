@@ -38,7 +38,7 @@ func NewService(config *commons.ServerConfig) (*AsyncExecCmdService, error) {
 
 	service := &AsyncExecCmdService{
 		config: config,
-		dropin: dropin.NewDropIn(config.DropInDirPath),
+		dropin: dropin.NewDropIn(config.GetDropInRootDirPath()),
 
 		terminateChan: make(chan bool),
 	}
@@ -165,7 +165,7 @@ func (svc *AsyncExecCmdService) Scrape() {
 	}
 
 	if len(items) > 0 {
-		logger.Debugf("found %d drop-ins in %s", len(items), svc.config.DropInDirPath)
+		logger.Debugf("found %d drop-ins in %s", len(items), svc.config.GetDropInRootDirPath())
 
 		messageChan := make(chan dropin.DropInItem)
 		bisqueChan := make(chan dropin.DropInItem)

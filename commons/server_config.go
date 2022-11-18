@@ -3,6 +3,10 @@ package commons
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path"
+	"path/filepath"
+	"time"
 
 	"gopkg.in/yaml.v2"
 )
@@ -10,10 +14,10 @@ import (
 const (
 	ConfigFilePathDefault string = "/etc/irods_rule_async_exec_cmd/config.yml"
 
-	LogFilePathDefault string = "/tmp/irods_rule_async_exec_cmd.log"
-
 	IrodsPortDefault     int    = 1247
 	IrodsRootPathDefault string = "/"
+
+	ReconnectInterval time.Duration = 1 * time.Minute
 )
 
 // AmqpConfig is a configuration struct for AMQP Message bus
@@ -39,9 +43,21 @@ type IrodsConfig struct {
 	AdminPassword string `yaml:"admin_password"`
 }
 
+func getLogFilename() string {
+	return "irods_rule_async_exec_cmd.log"
+}
+
+func GetDefaultDataRootDirPath() string {
+	dirPath, err := os.Getwd()
+	if err != nil {
+		return "/var/lib/irods_rule_async_exec_cmd"
+	}
+	return dirPath
+}
+
 // ServerConfig is a configuration struct for server
 type ServerConfig struct {
-	DropInDirPath string `yaml:"dropin_dir_path,omitempty"`
+	DataRootPath string `yaml:"data_root_path,omitempty"`
 
 	// iRODS FS Event Publish
 	AmqpConfig AmqpConfig `yaml:"amqp_config,omitempty"`
@@ -63,7 +79,7 @@ type ServerConfig struct {
 // NewDefaultServerConfig returns a default server config
 func NewDefaultServerConfig() *ServerConfig {
 	return &ServerConfig{
-		DropInDirPath: DropInDirPathDefault,
+		DataRootPath: GetDefaultDataRootDirPath(),
 
 		AmqpConfig: AmqpConfig{
 			URL:      "",
@@ -86,7 +102,7 @@ func NewDefaultServerConfig() *ServerConfig {
 			AdminPassword: "",
 		},
 
-		LogPath: LogFilePathDefault,
+		LogPath: "", // use default
 
 		Foreground:   false,
 		Debug:        false,
@@ -106,10 +122,80 @@ func NewServerConfigFromYAML(yamlBytes []byte) (*ServerConfig, error) {
 	return config, nil
 }
 
+// GetLogFilePath returns log file path
+func (config *ServerConfig) GetLogFilePath() string {
+	if len(config.LogPath) > 0 {
+		return config.LogPath
+	}
+
+	// default
+	return path.Join(config.DataRootPath, getLogFilename())
+}
+
+func (config *ServerConfig) GetDropInRootDirPath() string {
+	return path.Join(config.DataRootPath, "dropin")
+}
+
+// MakeLogDir makes a log dir required
+func (config *ServerConfig) MakeLogDir() error {
+	logFilePath := config.GetLogFilePath()
+	logDirPath := filepath.Dir(logFilePath)
+	err := config.makeDir(logDirPath)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// MakeWorkDirs makes dirs required
+func (config *ServerConfig) MakeWorkDirs() error {
+	dropinDirPath := config.GetDropInRootDirPath()
+	err := config.makeDir(dropinDirPath)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// makeDir makes a dir for use
+func (config *ServerConfig) makeDir(path string) error {
+	if len(path) == 0 {
+		return fmt.Errorf("failed to create a dir with empty path")
+	}
+
+	dirInfo, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// make
+			mkdirErr := os.MkdirAll(path, 0775)
+			if mkdirErr != nil {
+				return fmt.Errorf("making a dir (%s) error - %v", path, mkdirErr)
+			}
+
+			return nil
+		}
+
+		return fmt.Errorf("stating a dir (%s) error - %v", path, err)
+	}
+
+	if !dirInfo.IsDir() {
+		return fmt.Errorf("a file (%s) exist, not a directory", path)
+	}
+
+	dirPerm := dirInfo.Mode().Perm()
+	if dirPerm&0200 != 0200 {
+		return fmt.Errorf("a dir (%s) exist, but does not have the write permission", path)
+	}
+
+	return nil
+}
+
 // Validate validates field values and returns error if occurs
 func (config *ServerConfig) Validate() error {
-	if len(config.DropInDirPath) == 0 {
-		return errors.New("drop in dir path is not given")
+	if len(config.DataRootPath) == 0 {
+		return fmt.Errorf("data root dir must be given")
 	}
 
 	if len(config.AmqpConfig.URL) == 0 {

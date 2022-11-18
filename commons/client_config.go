@@ -7,6 +7,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	DropInDirPathDefault string = "/var/lib/irods_rule_async_exec_cmd/dropin"
+)
+
 // ClientConfig is a configuration struct for client
 type ClientConfig struct {
 	DropInDirPath string `yaml:"dropin_dir_path,omitempty"`

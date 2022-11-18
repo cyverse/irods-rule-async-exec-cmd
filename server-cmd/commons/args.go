@@ -162,22 +162,29 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ServerConfig, io.Write
 		return nil, nil, false, err // stop here
 	}
 
+	err = config.MakeLogDir()
+	if err != nil {
+		logger.Error(err)
+		return nil, nil, false, err // stop here
+	}
+
 	if config.Debug {
 		log.SetLevel(log.DebugLevel)
 	}
 
 	var logWriter io.WriteCloser
-	if config.LogPath == "-" || len(config.LogPath) == 0 {
+	logFilePath := config.GetLogFilePath()
+	if logFilePath == "-" || len(logFilePath) == 0 {
 		log.SetOutput(os.Stderr)
 	} else {
-		parentLogWriter, logFilePath := getLogWriterForParentProcess(config.LogPath)
+		parentLogWriter, parentLogFilePath := getLogWriterForParentProcess(logFilePath)
 		logWriter = parentLogWriter
 
 		// use multi output - to output to file and stdout
 		mw := io.MultiWriter(os.Stderr, parentLogWriter)
 		log.SetOutput(mw)
 
-		logger.Infof("Logging to %s", logFilePath)
+		logger.Infof("Logging to %s", parentLogFilePath)
 	}
 
 	return config, logWriter, true, nil // contiue

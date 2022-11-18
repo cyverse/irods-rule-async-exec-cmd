@@ -167,6 +167,19 @@ func run(config *commons.ServerConfig, isChildProcess bool) error {
 	versionInfo := commons.GetVersion()
 	logger.Infof("iRODS Rule Async Exec Cmd Service version - %s, commit - %s", versionInfo.ReleaseVersion, versionInfo.GitCommit)
 
+	// make work dirs required
+	err := config.MakeWorkDirs()
+	if err != nil {
+		logger.WithError(err).Error("invalid configuration")
+		return err
+	}
+
+	err = config.Validate()
+	if err != nil {
+		logger.WithError(err).Error("invalid configuration")
+		return err
+	}
+
 	// run a service
 	svc, err := service.NewService(config)
 	if err != nil {
@@ -188,7 +201,7 @@ func run(config *commons.ServerConfig, isChildProcess bool) error {
 
 	if isChildProcess {
 		cmd_commons.ReportChildProcessStartSuccessfully()
-		if len(config.LogPath) == 0 {
+		if len(config.GetLogFilePath()) == 0 {
 			cmd_commons.SetNilLogWriter()
 		}
 	}
