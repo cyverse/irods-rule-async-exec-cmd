@@ -26,12 +26,7 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ClientConfig, bool, er
 	debug := false
 	debugFlag := command.Flags().Lookup("debug")
 	if debugFlag != nil {
-		debugMode, err := strconv.ParseBool(debugFlag.Value.String())
-		if err != nil {
-			debug = false
-		}
-
-		debug = debugMode
+		debug, _ = strconv.ParseBool(debugFlag.Value.String())
 	}
 
 	if debug {
@@ -40,11 +35,7 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ClientConfig, bool, er
 
 	helpFlag := command.Flags().Lookup("help")
 	if helpFlag != nil {
-		help, err := strconv.ParseBool(helpFlag.Value.String())
-		if err != nil {
-			help = false
-		}
-
+		help, _ := strconv.ParseBool(helpFlag.Value.String())
 		if help {
 			PrintHelp(command)
 			return nil, false, nil // stop here
@@ -53,11 +44,7 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ClientConfig, bool, er
 
 	versionFlag := command.Flags().Lookup("version")
 	if versionFlag != nil {
-		version, err := strconv.ParseBool(versionFlag.Value.String())
-		if err != nil {
-			version = false
-		}
-
+		version, _ := strconv.ParseBool(versionFlag.Value.String())
 		if version {
 			PrintVersion(command)
 			return nil, false, nil // stop here

@@ -24,7 +24,7 @@ func SetCommonFlags(command *cobra.Command) {
 	command.Flags().BoolP("help", "h", false, "Print help")
 	command.Flags().BoolP("debug", "d", false, "Enable debug mode")
 	command.Flags().BoolP("foreground", "f", false, "Run in foreground")
-	command.Flags().BoolP(ChildProcessArgument, "", false, "")
+	command.Flags().Bool(ChildProcessArgument, false, "")
 }
 
 func ProcessCommonFlags(command *cobra.Command) (*commons.ServerConfig, io.WriteCloser, bool, error) {
@@ -36,34 +36,19 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ServerConfig, io.Write
 	debug := false
 	debugFlag := command.Flags().Lookup("debug")
 	if debugFlag != nil {
-		debugMode, err := strconv.ParseBool(debugFlag.Value.String())
-		if err != nil {
-			debug = false
-		}
-
-		debug = debugMode
+		debug, _ = strconv.ParseBool(debugFlag.Value.String())
 	}
 
 	foreground := false
 	foregroundFlag := command.Flags().Lookup("foreground")
 	if foregroundFlag != nil {
-		foregroundMode, err := strconv.ParseBool(foregroundFlag.Value.String())
-		if err != nil {
-			foreground = false
-		}
-
-		foreground = foregroundMode
+		foreground, _ = strconv.ParseBool(foregroundFlag.Value.String())
 	}
 
 	childProcess := false
 	childProcessFlag := command.Flags().Lookup(ChildProcessArgument)
 	if childProcessFlag != nil {
-		childProcessMode, err := strconv.ParseBool(childProcessFlag.Value.String())
-		if err != nil {
-			childProcess = false
-		}
-
-		childProcess = childProcessMode
+		childProcess, _ = strconv.ParseBool(childProcessFlag.Value.String())
 	}
 
 	if debug {
@@ -72,11 +57,7 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ServerConfig, io.Write
 
 	helpFlag := command.Flags().Lookup("help")
 	if helpFlag != nil {
-		help, err := strconv.ParseBool(helpFlag.Value.String())
-		if err != nil {
-			help = false
-		}
-
+		help, _ := strconv.ParseBool(helpFlag.Value.String())
 		if help {
 			PrintHelp(command)
 			return nil, nil, false, nil // stop here
@@ -85,11 +66,7 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ServerConfig, io.Write
 
 	versionFlag := command.Flags().Lookup("version")
 	if versionFlag != nil {
-		version, err := strconv.ParseBool(versionFlag.Value.String())
-		if err != nil {
-			version = false
-		}
-
+		version, _ := strconv.ParseBool(versionFlag.Value.String())
 		if version {
 			PrintVersion(command)
 			return nil, nil, false, nil // stop here
@@ -156,13 +133,7 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ServerConfig, io.Write
 
 	config.ChildProcess = childProcess
 
-	err := config.Validate()
-	if err != nil {
-		logger.Error(err)
-		return nil, nil, false, err // stop here
-	}
-
-	err = config.MakeLogDir()
+	err := config.MakeLogDir()
 	if err != nil {
 		logger.Error(err)
 		return nil, nil, false, err // stop here
@@ -187,7 +158,13 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ServerConfig, io.Write
 		logger.Infof("Logging to %s", parentLogFilePath)
 	}
 
-	return config, logWriter, true, nil // contiue
+	err = config.Validate()
+	if err != nil {
+		logger.Error(err)
+		return nil, logWriter, false, err // stop here
+	}
+
+	return config, logWriter, true, nil // continue
 }
 
 func PrintVersion(command *cobra.Command) error {
