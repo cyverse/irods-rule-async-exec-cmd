@@ -594,18 +594,18 @@ func (bisque *BisQue) getHomeUser(irodsPath string, defaultUser string) string {
 
 	defer commons.StackTraceFromPanic(logger)
 
-	zonePrefix := fmt.Sprintf("/%s/", bisque.config.IrodsZone)
-	trashPrefix := fmt.Sprintf("/%s/trash/", bisque.config.IrodsZone)
-	if strings.HasPrefix(irodsPath, trashPrefix) {
-		// starts with /trash/zone/
-		rest := irodsPath[len(trashPrefix):]
+	homePrefix := fmt.Sprintf("/%s/home/", bisque.config.IrodsZone)
+	trashHomePrefix := fmt.Sprintf("/%s/trash/home/", bisque.config.IrodsZone)
+	if strings.HasPrefix(irodsPath, trashHomePrefix) {
+		// starts with /zone/trash/home/
+		rest := irodsPath[len(trashHomePrefix):]
 		if len(rest) > 0 {
 			paths := strings.Split(rest, "/")
 			return paths[0]
 		}
-	} else if strings.HasPrefix(irodsPath, zonePrefix) {
-		// starts with /zone/
-		rest := irodsPath[len(zonePrefix):]
+	} else if strings.HasPrefix(irodsPath, homePrefix) {
+		// starts with /zone/home/
+		rest := irodsPath[len(homePrefix):]
 		if len(rest) > 0 {
 			paths := strings.Split(rest, "/")
 			return paths[0]
