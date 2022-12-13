@@ -418,7 +418,6 @@ func (bisque *BisQue) ProcessRemoveBisqueRequest(request *dropin.RemoveBisqueReq
 	}
 
 	params := map[string]string{
-		"user": request.IRODSUsername,
 		"path": irodsPathFromBisque,
 	}
 
@@ -466,7 +465,6 @@ func (bisque *BisQue) ProcessMoveBisqueRequest(request *dropin.MoveBisqueRequest
 	}
 
 	params := map[string]string{
-		"user":        request.IRODSUsername,
 		"path":        sourceIrodsPathFromBisque,
 		"destination": destIrodsPathFromBisque,
 	}
@@ -505,7 +503,7 @@ func (bisque *BisQue) get(url string, params map[string]string) (string, error) 
 
 	// basic-auth
 	req.SetBasicAuth(bisque.config.AdminUsername, bisque.config.AdminPassword)
-	req.Header.Add("content-type", "application/xml")
+	//req.Header.Add("content-type", "application/xml")
 
 	resp, err := bisque.client.Do(req)
 	if err != nil {
