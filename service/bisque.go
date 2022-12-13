@@ -353,9 +353,21 @@ func (bisque *BisQue) ProcessLinkBisqueRequest(request *dropin.LinkBisqueRequest
 		return err
 	}
 
+	if xmlDoc == nil {
+		err = fmt.Errorf("failed to parse xml response")
+		logger.Error(err)
+		return err
+	}
+
 	resourceNode, err := xmlquery.Query(xmlDoc, "//resource")
 	if err != nil {
 		logger.WithError(err).Error("failed to find 'resource' tag")
+		return err
+	}
+
+	if resourceNode == nil {
+		err = fmt.Errorf("failed to find 'resource' tag")
+		logger.Error(err)
 		return err
 	}
 
