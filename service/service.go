@@ -51,15 +51,20 @@ func NewService(config *commons.ServerConfig) (*AsyncExecCmdService, error) {
 
 	service.irods = irods
 
-	bisque, err := CreateBisque(service, &config.BisqueConfig)
-	if err != nil {
-		logger.Error(err)
-		return nil, err
+	var amqpEventHandler AmqpEventHandler
+
+	if len(config.BisqueConfig.URL) > 0 {
+		bisque, err := CreateBisque(service, &config.BisqueConfig)
+		if err != nil {
+			logger.Error(err)
+			return nil, err
+		}
+
+		service.bisque = bisque
+		amqpEventHandler = bisque.HandleAmqpEvent
 	}
 
-	service.bisque = bisque
-
-	amqp, err := CreateAmqp(service, &config.AmqpConfig, bisque.HandleAmqpEvent)
+	amqp, err := CreateAmqp(service, &config.AmqpConfig, amqpEventHandler)
 	if err != nil {
 		logger.Error(err)
 		return nil, err

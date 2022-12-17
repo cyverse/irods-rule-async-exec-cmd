@@ -206,28 +206,31 @@ func (config *ServerConfig) Validate() error {
 		return errors.New("AMQP Exchange is not given")
 	}
 
-	if len(config.BisqueConfig.URL) == 0 {
-		return errors.New("BisQue URL is not given")
-	}
+	// bisque config is optional
+	if len(config.BisqueConfig.URL) > 0 {
+		if len(config.BisqueConfig.URL) == 0 {
+			return errors.New("BisQue URL is not given")
+		}
 
-	if len(config.BisqueConfig.AdminUsername) == 0 {
-		return errors.New("BisQue Admin Username is not given")
-	}
+		if len(config.BisqueConfig.AdminUsername) == 0 {
+			return errors.New("BisQue Admin Username is not given")
+		}
 
-	if len(config.BisqueConfig.AdminPassword) == 0 {
-		return errors.New("BisQue Admin Password is not given")
-	}
+		if len(config.BisqueConfig.AdminPassword) == 0 {
+			return errors.New("BisQue Admin Password is not given")
+		}
 
-	if len(config.BisqueConfig.IrodsZone) == 0 {
-		return errors.New("BisQue iRODS Zone is not given")
-	}
+		if len(config.BisqueConfig.IrodsZone) == 0 {
+			return errors.New("BisQue iRODS Zone is not given")
+		}
 
-	if len(config.BisqueConfig.IrodsBaseURL) == 0 {
-		return errors.New("BisQue iRODS Base URL is not given")
-	}
+		if len(config.BisqueConfig.IrodsBaseURL) == 0 {
+			return errors.New("BisQue iRODS Base URL is not given")
+		}
 
-	if len(config.BisqueConfig.IrodsRootPath) == 0 {
-		return errors.New("BisQue iRODS Root Path is not given")
+		if len(config.BisqueConfig.IrodsRootPath) == 0 {
+			return errors.New("BisQue iRODS Root Path is not given")
+		}
 	}
 
 	if len(config.IrodsConfig.Host) == 0 {
