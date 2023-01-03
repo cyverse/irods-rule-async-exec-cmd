@@ -2,12 +2,15 @@ package commons
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
+	"os"
 	"strconv"
 
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func SetCommonFlags(command *cobra.Command) {
@@ -86,6 +89,18 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ClientConfig, bool, er
 		log.SetLevel(log.DebugLevel)
 	}
 
+	var logWriter io.WriteCloser
+	logFilePath := config.GetLogFilePath()
+	if logFilePath != "-" || len(logFilePath) >= 0 {
+		logWriter = getLogWriter(logFilePath)
+
+		// use multi output - to output to file and stdout
+		mw := io.MultiWriter(os.Stderr, logWriter)
+		log.SetOutput(mw)
+
+		logger.Infof("Logging to %s", logFilePath)
+	}
+
 	err := config.Validate()
 	if err != nil {
 		logger.Error(err)
@@ -107,4 +122,14 @@ func PrintVersion(command *cobra.Command) error {
 
 func PrintHelp(command *cobra.Command) error {
 	return command.Usage()
+}
+
+func getLogWriter(logPath string) io.WriteCloser {
+	return &lumberjack.Logger{
+		Filename:   logPath,
+		MaxSize:    50, // 50MB
+		MaxBackups: 5,
+		MaxAge:     30, // 30 days
+		Compress:   false,
+	}
 }

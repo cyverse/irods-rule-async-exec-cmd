@@ -14,12 +14,17 @@ const (
 // ClientConfig is a configuration struct for client
 type ClientConfig struct {
 	DropInDirPath string `yaml:"dropin_dir_path,omitempty"`
+
+	// for Logging
+	LogPath string `yaml:"log_path,omitempty"`
 }
 
 // NewDefaultClientConfig returns a default client config
 func NewDefaultClientConfig() *ClientConfig {
 	return &ClientConfig{
 		DropInDirPath: DropInDirPathDefault,
+
+		LogPath: "", // use default
 	}
 }
 
@@ -42,4 +47,14 @@ func (config *ClientConfig) Validate() error {
 	}
 
 	return nil
+}
+
+// GetLogFilePath returns log file path
+func (config *ClientConfig) GetLogFilePath() string {
+	if len(config.LogPath) > 0 {
+		return config.LogPath
+	}
+
+	// default
+	return "/var/lib/irods_rule_async_exec_cmd/irods_rule_async_exec_cmd_client.log"
 }

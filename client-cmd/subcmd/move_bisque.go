@@ -3,6 +3,7 @@ package subcmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	cmd_commons "github.com/cyverse/irods-rule-async-exec-cmd/client-cmd/commons"
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
@@ -41,6 +42,8 @@ func processMoveBisqueCommand(command *cobra.Command, args []string) error {
 	if !cont {
 		return nil
 	}
+
+	logger.Infof("[move_bisque] %s", strings.Join(args, " "))
 
 	// move_bisque requires
 	// 1. iRODS username who moved an iRODS file

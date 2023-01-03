@@ -3,6 +3,7 @@ package subcmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	cmd_commons "github.com/cyverse/irods-rule-async-exec-cmd/client-cmd/commons"
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
@@ -41,6 +42,8 @@ func processSendMsgCommand(command *cobra.Command, args []string) error {
 	if !cont {
 		return nil
 	}
+
+	logger.Infof("[send_msg] %s", strings.Join(args, " "))
 
 	// send_msg requires 2 arguments
 	// 1. key
