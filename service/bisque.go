@@ -362,6 +362,8 @@ func (bisque *BisQue) ProcessLinkBisqueRequest(request *dropin.LinkBisqueRequest
 		return err
 	}
 
+	logger.Infof("received a HTTP response for linking an iRODS object %s to %s - \"%s\"", request.IRODSPath, irodsPathFromBisque, resp)
+
 	resourceNode, err := xmlquery.Query(xmlDoc, "//resource")
 	if err != nil {
 		logger.WithError(err).Error("failed to find 'resource' tag")
