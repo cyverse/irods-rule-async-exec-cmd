@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/antchfx/xmlquery"
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
@@ -38,7 +39,9 @@ func CreateBisque(service *AsyncExecCmdService, config *commons.BisqueConfig) (*
 
 	context := context.Background()
 
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 3 * time.Minute,
+	}
 
 	return &BisQue{
 		service: service,
