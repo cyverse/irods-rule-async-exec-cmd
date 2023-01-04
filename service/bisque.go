@@ -364,19 +364,19 @@ func (bisque *BisQue) ProcessLinkBisqueRequest(request *dropin.LinkBisqueRequest
 
 	logger.Infof("received a HTTP response for linking an iRODS object %s to %s - \"%s\"", request.IRODSPath, irodsPathFromBisque, resp)
 
-	resourceNode, err := xmlquery.Query(xmlDoc, "//resource")
+	rootNode, err := xmlquery.Query(xmlDoc, "node()")
 	if err != nil {
-		logger.WithError(err).Error("failed to find 'resource' tag")
+		logger.WithError(err).Error("failed to find root node")
 		return err
 	}
 
-	if resourceNode == nil {
-		err = fmt.Errorf("failed to find 'resource' tag")
+	if rootNode == nil {
+		err = fmt.Errorf("failed to find root node")
 		logger.Error(err)
 		return err
 	}
 
-	resourceUniqAttr := resourceNode.SelectAttr("resource_uniq")
+	resourceUniqAttr := rootNode.SelectAttr("resource_uniq")
 	if len(resourceUniqAttr) == 0 {
 		err = fmt.Errorf("failed to find 'resource_uniq' attribute")
 		logger.Error(err)
