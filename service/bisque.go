@@ -211,7 +211,7 @@ func (bisque *BisQue) processAmqpMoveMessage(msg amqp_mod.Delivery) {
 
 			logger.Debugf("drop a link bisque request %s, %s", bisqueUser, newPath)
 
-			request := dropin.NewRemoveBisqueRequest(bisqueUser, oldPath)
+			request := dropin.NewLinkBisqueRequest(bisqueUser, newPath)
 			err = bisque.service.dropin.Drop(request)
 			if err != nil {
 				logger.WithError(err).Errorf("failed to drop a link bisque request - %s, %s", bisqueUser, newPath)
