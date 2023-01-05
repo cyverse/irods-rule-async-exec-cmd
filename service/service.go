@@ -181,14 +181,22 @@ func (svc *AsyncExecCmdService) Scrape() {
 		// we create two goroutines to handle them separately in parallel
 		go func() {
 			for item := range messageChan {
-				svc.ProcessItem(item)
+				if !svc.ProcessItem(item) {
+					break
+					// ignore all items in the messageChan
+					// to be processed in the next iteration
+				}
 			}
 			wg.Done()
 		}()
 
 		go func() {
 			for item := range bisqueChan {
-				svc.ProcessItem(item)
+				if !svc.ProcessItem(item) {
+					break
+					// ignore all items in the bisqueChan
+					// to be processed in the next iteration
+				}
 			}
 			wg.Done()
 		}()
@@ -212,7 +220,7 @@ func (svc *AsyncExecCmdService) Scrape() {
 	}
 }
 
-func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) {
+func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) bool {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "AsyncExecCmdService",
@@ -226,6 +234,8 @@ func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) {
 			logger.WithError(err).Errorf("service is not ready. will retry next time. pending drop-in %s", item.GetRequestType())
 			// do not mark failed
 			// will retry at next iteration
+			// drop all items
+			return false
 		} else {
 			logger.WithError(err).Errorf("failed to process drop-in %s", item.GetRequestType())
 			svc.dropin.MarkFailed(item)
@@ -241,6 +251,8 @@ func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) {
 			}
 		}
 	}
+
+	return true
 }
 
 func (svc *AsyncExecCmdService) distributeItem(item dropin.DropInItem) error {
