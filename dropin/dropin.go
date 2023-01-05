@@ -85,7 +85,9 @@ func (dropin *DropIn) MakeDropInDir() error {
 func (dropin *DropIn) Drop(item DropInItem) error {
 	// save as a file
 	id := strconv.FormatInt(time.Now().UnixMicro(), 10)
-	dropInFilePath := filepath.Join(dropin.Dir, id)
+	pid := os.Getpid()
+	filename := fmt.Sprintf("%s-%d", id, pid)
+	dropInFilePath := filepath.Join(dropin.Dir, filename)
 
 	return item.SaveToFile(dropInFilePath)
 }
