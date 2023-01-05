@@ -86,7 +86,7 @@ func (amqp *AMQP) ensureConnected() error {
 			return amqp.connect()
 		} else {
 			// too early to reconnect
-			return fmt.Errorf("ignore reconnect request. will try after %f seconds from last trial", commons.ReconnectInterval.Seconds())
+			return NewServiceNotReadyErrorf("ignore reconnect request. will try after %f seconds from last trial", commons.ReconnectInterval.Seconds())
 		}
 	}
 

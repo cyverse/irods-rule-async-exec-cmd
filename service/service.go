@@ -222,8 +222,14 @@ func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) {
 	logger.Debug("Processing a drop-in item")
 	err := svc.distributeItem(item)
 	if err != nil {
-		logger.WithError(err).Errorf("failed to process drop-in %s", item.GetRequestType())
-		svc.dropin.MarkFailed(item)
+		if IsServiceNotReadyError(err) {
+			logger.WithError(err).Errorf("service is not ready. will retry next time. pending drop-in %s", item.GetRequestType())
+			// do not mark failed
+			// will retry at next iteration
+		} else {
+			logger.WithError(err).Errorf("failed to process drop-in %s", item.GetRequestType())
+			svc.dropin.MarkFailed(item)
+		}
 	} else {
 		logger.Debugf("Processed a drop-in item")
 
