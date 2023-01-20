@@ -32,7 +32,7 @@ type BisqueConfig struct {
 	AdminPassword string `yaml:"admin_password"`
 	IrodsZone     string `yaml:"irods_zone"`
 	IrodsBaseURL  string `yaml:"irods_base_url"`  // include http:// or file://
-	IrodsRootPath string `yaml:"irods_root_path"` // e.g., '/' datastore, '/iplant/home' for ucsb
+	IrodsRootPath string `yaml:"irods_root_path"` // e.g., '/ucsb/home' for ucsb
 }
 
 type IrodsConfig struct {

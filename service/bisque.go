@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"path"
 	"strings"
 	"time"
 
@@ -17,8 +16,9 @@ import (
 )
 
 const (
-	IRODSKeyValForBisqueID      string = "ipc-bisque-id"
-	BisqueLinkPermissionDefault string = "private"
+	IRODSKeyValForBisqueID string = "ipc-bisque-id"
+	//BisqueLinkPermissionDefault string = "private"
+	BisqueLinkPermissionDefault string = "published"
 )
 
 type BisQue struct {
@@ -131,7 +131,7 @@ func (bisque *BisQue) processAmqpAddMessage(msg amqp_mod.Delivery) {
 
 	if !bisque.isIrodsPathForBisque(path) {
 		// ignore
-		logger.Debugf("ignoring the request since the iRODS path %s is out of iRODS root path %s", path, bisque.config.IrodsRootPath)
+		logger.Debugf("ignoring the request since the iRODS path %s is out of BisQue's iRODS root path %s", path, bisque.config.IrodsRootPath)
 		return
 	}
 
@@ -331,8 +331,13 @@ func (bisque *BisQue) ProcessLinkBisqueRequest(request *dropin.LinkBisqueRequest
 		"user": request.IRODSUsername,
 	}
 
-	resourceName := path.Base(request.IRODSPath)
-	irodsPathFromBisque, err := bisque.getIrodsURL(request.IRODSPath)
+	resourceName, err := bisque.getBisqueResourcePath(request.IRODSPath)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to get resource name for linking an iRODS object %s", request.IRODSPath)
+		return err
+	}
+
+	irodsPathFromBisque, err := bisque.getIrodsPath(request.IRODSPath)
 	if err != nil {
 		logger.WithError(err).Errorf("failed to get iRODS URL for linking an iRODS object %s", request.IRODSPath)
 		return err
@@ -342,11 +347,11 @@ func (bisque *BisQue) ProcessLinkBisqueRequest(request *dropin.LinkBisqueRequest
 
 	resp, err := bisque.post(bisqueUrl, params, body)
 	if err != nil {
-		logger.WithError(err).Errorf("failed to send a HTTP request for linking an iRODS object %s", request.IRODSPath)
+		logger.WithError(err).Errorf("failed to send a HTTP request for linking an iRODS object %s to %s (%s in bisque)", request.IRODSPath, irodsPathFromBisque, resourceName)
 		return err
 	}
 
-	logger.Infof("published a HTTP request for linking an iRODS object %s to %s", request.IRODSPath, irodsPathFromBisque)
+	logger.Infof("published a HTTP request for linking an iRODS object %s to %s (%s in bisque)", request.IRODSPath, irodsPathFromBisque, resourceName)
 
 	// process response xml
 	resp = strings.TrimSpace(resp)
@@ -416,7 +421,7 @@ func (bisque *BisQue) ProcessRemoveBisqueRequest(request *dropin.RemoveBisqueReq
 
 	bisqueUrl := bisque.getApiUrl("/blob_service/paths/remove")
 
-	irodsPathFromBisque, err := bisque.getIrodsURL(request.IRODSPath)
+	irodsPathFromBisque, err := bisque.getIrodsPath(request.IRODSPath)
 	if err != nil {
 		logger.WithError(err).Errorf("failed to get iRODS URL for removing an iRODS object %s", request.IRODSPath)
 		return err
@@ -457,13 +462,13 @@ func (bisque *BisQue) ProcessMoveBisqueRequest(request *dropin.MoveBisqueRequest
 
 	bisqueUrl := bisque.getApiUrl("/blob_service/paths/move")
 
-	sourceIrodsPathFromBisque, err := bisque.getIrodsURL(request.SourceIRODSPath)
+	sourceIrodsPathFromBisque, err := bisque.getIrodsPath(request.SourceIRODSPath)
 	if err != nil {
 		logger.WithError(err).Errorf("failed to get iRODS URL for moving an iRODS object %s", request.SourceIRODSPath)
 		return err
 	}
 
-	destIrodsPathFromBisque, err := bisque.getIrodsURL(request.DestIRODSPath)
+	destIrodsPathFromBisque, err := bisque.getIrodsPath(request.DestIRODSPath)
 	if err != nil {
 		logger.WithError(err).Errorf("failed to get iRODS URL for moving an iRODS object %s", request.DestIRODSPath)
 		return err
@@ -508,7 +513,6 @@ func (bisque *BisQue) get(url string, params map[string]string) (string, error) 
 
 	// basic-auth
 	req.SetBasicAuth(bisque.config.AdminUsername, bisque.config.AdminPassword)
-	//req.Header.Add("content-type", "application/xml")
 
 	resp, err := bisque.client.Do(req)
 	if err != nil {
@@ -584,7 +588,7 @@ func (bisque *BisQue) getApiUrl(path string) string {
 	return fmt.Sprintf("%s/%s", strings.TrimRight(bisque.config.URL, "/"), strings.TrimLeft(path, "/"))
 }
 
-func (bisque *BisQue) getIrodsURL(irodsPath string) (string, error) {
+func (bisque *BisQue) getIrodsPath(irodsPath string) (string, error) {
 	base := fmt.Sprintf("%s/", strings.TrimRight(bisque.config.IrodsRootPath, "/"))
 	if !strings.HasPrefix(irodsPath, base) {
 		return "", fmt.Errorf("iRODS Path %s is not under iRODS root path %s", irodsPath, bisque.config.IrodsRootPath)
@@ -593,6 +597,26 @@ func (bisque *BisQue) getIrodsURL(irodsPath string) (string, error) {
 	rel := irodsPath[len(base):]
 
 	return fmt.Sprintf("%s/%s", strings.TrimRight(bisque.config.IrodsBaseURL, "/"), strings.TrimLeft(rel, "/")), nil
+}
+
+func (bisque *BisQue) getBisqueResourcePath(irodsPath string) (string, error) {
+	base := fmt.Sprintf("%s/", strings.TrimRight(bisque.config.IrodsRootPath, "/"))
+	if !strings.HasPrefix(irodsPath, base) {
+		return "", fmt.Errorf("iRODS Path %s is not under iRODS root path %s", irodsPath, bisque.config.IrodsRootPath)
+	}
+
+	rel := irodsPath[len(base):]
+
+	// remove username dir in front
+	rel = strings.TrimLeft(rel, "/")
+
+	relSplit := strings.Split(rel, "/")
+	if len(relSplit) > 1 {
+		rel = strings.Join(relSplit[1:], "/")
+	}
+
+	// do not add "/" in front
+	return strings.TrimLeft(rel, "/"), nil
 }
 
 func (bisque *BisQue) isIrodsPathForBisque(irodsPath string) bool {

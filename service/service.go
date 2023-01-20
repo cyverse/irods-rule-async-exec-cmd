@@ -162,7 +162,7 @@ func (svc *AsyncExecCmdService) Scrape() {
 		"function": "Scrape",
 	})
 
-	//logger.Debugf("checking drop-ins in %s", svc.config.DropInDirPath)
+	logger.Debugf("checking drop-ins at %s", svc.config.GetDropInRootDirPath())
 	items, err := svc.dropin.Scrape()
 	if err != nil {
 		logger.Error(err)
@@ -170,7 +170,7 @@ func (svc *AsyncExecCmdService) Scrape() {
 	}
 
 	if len(items) > 0 {
-		logger.Debugf("found %d drop-ins in %s", len(items), svc.config.GetDropInRootDirPath())
+		logger.Debugf("found %d drop-ins at %s", len(items), svc.config.GetDropInRootDirPath())
 
 		messageChan := make(chan dropin.DropInItem)
 		bisqueChan := make(chan dropin.DropInItem)
