@@ -3,7 +3,6 @@ package commons
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strconv"
 
@@ -61,7 +60,7 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ClientConfig, bool, er
 	if configFlag != nil {
 		configPath := configFlag.Value.String()
 		if len(configPath) > 0 {
-			yamlBytes, err := ioutil.ReadFile(configPath)
+			yamlBytes, err := os.ReadFile(configPath)
 			if err != nil {
 				logger.Error(err)
 				return nil, false, err // stop here

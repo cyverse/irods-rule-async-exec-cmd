@@ -3,7 +3,6 @@ package commons
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strconv"
 
@@ -80,7 +79,7 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ServerConfig, io.Write
 	if configFlag != nil {
 		configPath := configFlag.Value.String()
 		if len(configPath) > 0 {
-			yamlBytes, err := ioutil.ReadFile(configPath)
+			yamlBytes, err := os.ReadFile(configPath)
 			if err != nil {
 				logger.Error(err)
 				return nil, nil, false, err // stop here
@@ -100,7 +99,7 @@ func ProcessCommonFlags(command *cobra.Command) (*commons.ServerConfig, io.Write
 
 	// default config
 	if !readConfig {
-		yamlBytes, err := ioutil.ReadFile(commons.ConfigFilePathDefault)
+		yamlBytes, err := os.ReadFile(commons.ConfigFilePathDefault)
 		if err != nil {
 			logger.Error(err)
 			return nil, nil, false, err // stop here

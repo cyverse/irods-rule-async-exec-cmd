@@ -3,7 +3,7 @@ package dropin
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"time"
 )
 
@@ -52,7 +52,7 @@ func (base *DropInItemBase) SetItemFilePath(path string) {
 
 // NewDropInRequestFromFile creates DropInItem from a file
 func NewDropInRequestFromFile(path string) (DropInItem, error) {
-	bytes, err := ioutil.ReadFile(path)
+	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (request *SendMessageRequest) SaveToFile(path string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(path, bytes, 0o666)
+	return os.WriteFile(path, bytes, 0o666)
 }
 
 func (request *SendMessageRequest) ToString() string {
@@ -177,7 +177,7 @@ func (request *LinkBisqueRequest) SaveToFile(path string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(path, bytes, 0o666)
+	return os.WriteFile(path, bytes, 0o666)
 }
 
 func (request *LinkBisqueRequest) ToString() string {
@@ -222,7 +222,7 @@ func (request *RemoveBisqueRequest) SaveToFile(path string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(path, bytes, 0o666)
+	return os.WriteFile(path, bytes, 0o666)
 }
 
 func (request *RemoveBisqueRequest) ToString() string {
@@ -269,7 +269,7 @@ func (request *MoveBisqueRequest) SaveToFile(path string) error {
 		return err
 	}
 
-	return ioutil.WriteFile(path, bytes, 0o666)
+	return os.WriteFile(path, bytes, 0o666)
 }
 
 func (request *MoveBisqueRequest) ToString() string {

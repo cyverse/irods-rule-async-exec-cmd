@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"path"
 	"strings"
@@ -18,7 +17,8 @@ import (
 )
 
 const (
-	IRODSKeyValForBisqueID string = "ipc-bisque-id"
+	IRODSKeyValForBisqueID      string = "ipc-bisque-id"
+	BisqueLinkPermissionDefault string = "private"
 )
 
 type BisQue struct {
@@ -338,7 +338,7 @@ func (bisque *BisQue) ProcessLinkBisqueRequest(request *dropin.LinkBisqueRequest
 		return err
 	}
 
-	body := fmt.Sprintf("<resource name=\"%s\" permission=\"published\" value=\"%s\" />", resourceName, irodsPathFromBisque)
+	body := fmt.Sprintf("<resource name=\"%s\" permission=\"%s\" value=\"%s\" />", resourceName, BisqueLinkPermissionDefault, irodsPathFromBisque)
 
 	resp, err := bisque.post(bisqueUrl, params, body)
 	if err != nil {
@@ -557,7 +557,7 @@ func (bisque *BisQue) post(url string, params map[string]string, body string) (s
 	req.SetBasicAuth(bisque.config.AdminUsername, bisque.config.AdminPassword)
 	req.Header.Add("content-type", "application/xml")
 
-	req.Body = ioutil.NopCloser(strings.NewReader(body))
+	req.Body = io.NopCloser(strings.NewReader(body))
 	resp, err := bisque.client.Do(req)
 	if err != nil {
 		return "", err

@@ -2,7 +2,6 @@ package dropin
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -94,7 +93,7 @@ func (dropin *DropIn) Drop(item DropInItem) error {
 
 // Scrape finds all drop-ins
 func (dropin *DropIn) Scrape() ([]DropInItem, error) {
-	files, err := ioutil.ReadDir(dropin.Dir)
+	files, err := os.ReadDir(dropin.Dir)
 	if err != nil {
 		return nil, err
 	}
