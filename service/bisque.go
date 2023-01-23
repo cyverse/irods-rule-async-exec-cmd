@@ -16,9 +16,9 @@ import (
 )
 
 const (
-	IRODSKeyValForBisqueID string = "ipc-bisque-id"
-	//BisqueLinkPermissionDefault string = "private"
-	BisqueLinkPermissionDefault string = "published"
+	IRODSKeyValForBisqueID      string = "ipc-bisque-id"
+	BisqueLinkPermissionDefault string = "private"
+	//BisqueLinkPermissionDefault string = "published"
 )
 
 type BisQue struct {
