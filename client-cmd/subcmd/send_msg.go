@@ -7,7 +7,7 @@ import (
 
 	cmd_commons "github.com/cyverse/irods-rule-async-exec-cmd/client-cmd/commons"
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
-	"github.com/cyverse/irods-rule-async-exec-cmd/dropin"
+	"github.com/cyverse/irods-rule-async-exec-cmd/turnin"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -16,7 +16,7 @@ var sendMsgCmd = &cobra.Command{
 	Use:   "send_msg [key] [body]",
 	Short: "Send a message to MessageBus",
 	Long: `This buffers a message to be sent to AMQP message server.
-	The message is stored in the drop in dir temporarily, then processed by the service.`,
+	The message is stored in the turn-in dir temporarily, then processed by the service.`,
 	RunE: processSendMsgCommand,
 }
 
@@ -51,7 +51,7 @@ func processSendMsgCommand(command *cobra.Command, args []string) error {
 	if len(args) >= 2 {
 		key := args[0]
 		body := args[1]
-		err = dropSendMessageRequestOne(config, key, body)
+		err = turninSendMessageRequestOne(config, key, body)
 		if err != nil {
 			logger.Error(err)
 			fmt.Fprintln(os.Stderr, err.Error())
@@ -66,18 +66,18 @@ func processSendMsgCommand(command *cobra.Command, args []string) error {
 	return nil
 }
 
-func dropSendMessageRequestOne(config *commons.ClientConfig, key string, body string) error {
+func turninSendMessageRequestOne(config *commons.ClientConfig, key string, body string) error {
 	logger := log.WithFields(log.Fields{
 		"package":  "subcmd",
-		"function": "dropSendMessageRequestOne",
+		"function": "turninSendMessageRequestOne",
 	})
 
-	di := dropin.NewDropIn(config.DropInDirPath)
+	ti := turnin.NewTurnIn(config.TurnInDirPath)
 
-	logger.Debugf("drop a send message request %s", key)
+	logger.Debugf("turn-in a send message request %s", key)
 
-	request := dropin.NewSendMessageRequest(key, body)
-	err := di.Drop(request)
+	request := turnin.NewSendMessageRequest(key, body)
+	err := ti.Turnin(request)
 	if err != nil {
 		logger.Error(err)
 		return err

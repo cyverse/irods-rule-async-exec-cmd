@@ -8,12 +8,12 @@ import (
 )
 
 const (
-	DropInDirPathDefault string = "/var/lib/irods_rule_async_exec_cmd/dropin"
+	TurnInDirPathDefault string = "/var/lib/irods_rule_async_exec_cmd/turnin"
 )
 
 // ClientConfig is a configuration struct for client
 type ClientConfig struct {
-	DropInDirPath string `yaml:"dropin_dir_path,omitempty"`
+	TurnInDirPath string `yaml:"turnin_dir_path,omitempty"`
 
 	// for Logging
 	LogPath string `yaml:"log_path,omitempty"`
@@ -22,7 +22,7 @@ type ClientConfig struct {
 // NewDefaultClientConfig returns a default client config
 func NewDefaultClientConfig() *ClientConfig {
 	return &ClientConfig{
-		DropInDirPath: DropInDirPathDefault,
+		TurnInDirPath: TurnInDirPathDefault,
 
 		LogPath: "", // use default
 	}
@@ -42,8 +42,8 @@ func NewClientConfigFromYAML(yamlBytes []byte) (*ClientConfig, error) {
 
 // Validate validates field values and returns error if occurs
 func (config *ClientConfig) Validate() error {
-	if len(config.DropInDirPath) == 0 {
-		return errors.New("drop in dir path is not given")
+	if len(config.TurnInDirPath) == 0 {
+		return errors.New("turn-in dir path is not given")
 	}
 
 	return nil

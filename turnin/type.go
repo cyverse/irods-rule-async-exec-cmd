@@ -1,4 +1,4 @@
-package dropin
+package turnin
 
 import (
 	"encoding/json"
@@ -7,18 +7,18 @@ import (
 	"time"
 )
 
-type DropInRequestType string
+type TurnInRequestType string
 
 const (
-	SendMessageRequestType  DropInRequestType = "send_message"
-	LinkBisqueRequestType   DropInRequestType = "link_bisque"
-	RemoveBisqueRequestType DropInRequestType = "remove_bisque"
-	MoveBisqueRequestType   DropInRequestType = "move_bisque"
+	SendMessageRequestType  TurnInRequestType = "send_message"
+	LinkBisqueRequestType   TurnInRequestType = "link_bisque"
+	RemoveBisqueRequestType TurnInRequestType = "remove_bisque"
+	MoveBisqueRequestType   TurnInRequestType = "move_bisque"
 )
 
-// DropInItem is an interface that all drop-in items must implement
-type DropInItem interface {
-	GetRequestType() DropInRequestType
+// TurnInItem is an interface that all turn-in items must implement
+type TurnInItem interface {
+	GetRequestType() TurnInRequestType
 	GetCreationTime() time.Time
 	GetItemFilePath() string
 	SetItemFilePath(path string)
@@ -27,37 +27,37 @@ type DropInItem interface {
 	SaveToFile(path string) error
 }
 
-// DropInItemBase is a common parts that all drop-in items must contain
-type DropInItemBase struct {
-	Type         DropInRequestType `json:"type"`          // requred to identify what this item is
+// TurnInItemBase is a common parts that all turn-in items must contain
+type TurnInItemBase struct {
+	Type         TurnInRequestType `json:"type"`          // requred to identify what this item is
 	CreationTime time.Time         `json:"creation_time"` // creation time
-	FilePath     string            `json:"-"`             // stores physical path of item, to be filled when the item is drop-in
+	FilePath     string            `json:"-"`             // stores physical path of item, to be filled when the item is turn-in
 }
 
-func (base *DropInItemBase) GetRequestType() DropInRequestType {
+func (base *TurnInItemBase) GetRequestType() TurnInRequestType {
 	return base.Type
 }
 
-func (base *DropInItemBase) GetCreationTime() time.Time {
+func (base *TurnInItemBase) GetCreationTime() time.Time {
 	return base.CreationTime
 }
 
-func (base *DropInItemBase) GetItemFilePath() string {
+func (base *TurnInItemBase) GetItemFilePath() string {
 	return base.FilePath
 }
 
-func (base *DropInItemBase) SetItemFilePath(path string) {
+func (base *TurnInItemBase) SetItemFilePath(path string) {
 	base.FilePath = path
 }
 
-// NewDropInRequestFromFile creates DropInItem from a file
-func NewDropInRequestFromFile(path string) (DropInItem, error) {
+// NewTurnInRequestFromFile creates TurnInItem from a file
+func NewTurnInRequestFromFile(path string) (TurnInItem, error) {
 	bytes, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := NewDropInRequest(bytes)
+	req, err := NewTurnInRequest(bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -66,8 +66,8 @@ func NewDropInRequestFromFile(path string) (DropInItem, error) {
 	return req, nil
 }
 
-// NewDropInRequestFromFile creates DropInItem from byte array
-func NewDropInRequest(bytes []byte) (DropInItem, error) {
+// NewTurnInRequest creates TurnInItem from byte array
+func NewTurnInRequest(bytes []byte) (TurnInItem, error) {
 	var content map[string]interface{}
 
 	err := json.Unmarshal(bytes, &content)
@@ -77,7 +77,7 @@ func NewDropInRequest(bytes []byte) (DropInItem, error) {
 
 	if reqType, ok := content["type"]; ok {
 		reqTypeString := reqType.(string)
-		switch DropInRequestType(reqTypeString) {
+		switch TurnInRequestType(reqTypeString) {
 		case SendMessageRequestType:
 			return NewSendMessageRequestFromBytes(bytes)
 		case LinkBisqueRequestType:
@@ -95,7 +95,7 @@ func NewDropInRequest(bytes []byte) (DropInItem, error) {
 }
 
 type SendMessageRequest struct {
-	DropInItemBase
+	TurnInItemBase
 
 	Key  string `json:"key"`
 	Body string `json:"body"`
@@ -103,7 +103,7 @@ type SendMessageRequest struct {
 
 func NewSendMessageRequest(key string, body string) *SendMessageRequest {
 	return &SendMessageRequest{
-		DropInItemBase: DropInItemBase{
+		TurnInItemBase: TurnInItemBase{
 			Type:         SendMessageRequestType,
 			CreationTime: time.Now().Local(),
 		},
@@ -140,7 +140,7 @@ func (request *SendMessageRequest) ToString() string {
 }
 
 type LinkBisqueRequest struct {
-	DropInItemBase
+	TurnInItemBase
 
 	IRODSUsername string `json:"irods_username"`
 	IRODSPath     string `json:"irods_path"`
@@ -148,7 +148,7 @@ type LinkBisqueRequest struct {
 
 func NewLinkBisqueRequest(irodsUsername string, irodsPath string) *LinkBisqueRequest {
 	return &LinkBisqueRequest{
-		DropInItemBase: DropInItemBase{
+		TurnInItemBase: TurnInItemBase{
 			Type:         LinkBisqueRequestType,
 			CreationTime: time.Now().Local(),
 		},
@@ -185,7 +185,7 @@ func (request *LinkBisqueRequest) ToString() string {
 }
 
 type RemoveBisqueRequest struct {
-	DropInItemBase
+	TurnInItemBase
 
 	IRODSUsername string `json:"irods_username"`
 	IRODSPath     string `json:"irods_path"`
@@ -193,7 +193,7 @@ type RemoveBisqueRequest struct {
 
 func NewRemoveBisqueRequest(irodsUsername string, irodsPath string) *RemoveBisqueRequest {
 	return &RemoveBisqueRequest{
-		DropInItemBase: DropInItemBase{
+		TurnInItemBase: TurnInItemBase{
 			Type:         RemoveBisqueRequestType,
 			CreationTime: time.Now().Local(),
 		},
@@ -230,7 +230,7 @@ func (request *RemoveBisqueRequest) ToString() string {
 }
 
 type MoveBisqueRequest struct {
-	DropInItemBase
+	TurnInItemBase
 
 	IRODSUsername   string `json:"irods_username"`
 	SourceIRODSPath string `json:"source_irods_path"`
@@ -239,7 +239,7 @@ type MoveBisqueRequest struct {
 
 func NewMoveBisqueRequest(irodsUsername string, sourceIrodsPath string, destIrodsPath string) *MoveBisqueRequest {
 	return &MoveBisqueRequest{
-		DropInItemBase: DropInItemBase{
+		TurnInItemBase: TurnInItemBase{
 			Type:         MoveBisqueRequestType,
 			CreationTime: time.Now().Local(),
 		},
@@ -276,13 +276,13 @@ func (request *MoveBisqueRequest) ToString() string {
 	return fmt.Sprintf("move bisque request - irods user: '%s', source irods path: '%s', dest irods path: '%s', timestamp: %s", request.IRODSUsername, request.SourceIRODSPath, request.DestIRODSPath, request.CreationTime.String())
 }
 
-// IsItemTypeSendMessage checks if the given dropin item is SendMessage request type
-func IsItemTypeSendMessage(item DropInItem) bool {
+// IsItemTypeSendMessage checks if the given turn-in item is SendMessage request type
+func IsItemTypeSendMessage(item TurnInItem) bool {
 	return item.GetRequestType() == SendMessageRequestType
 }
 
-// IsItemTypeBisque checks if the given dropin item is *Bisque request types
-func IsItemTypeBisque(item DropInItem) bool {
+// IsItemTypeBisque checks if the given turn-in item is *Bisque request types
+func IsItemTypeBisque(item TurnInItem) bool {
 	switch item.GetRequestType() {
 	case LinkBisqueRequestType, RemoveBisqueRequestType, MoveBisqueRequestType:
 		return true

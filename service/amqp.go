@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
-	"github.com/cyverse/irods-rule-async-exec-cmd/dropin"
+	"github.com/cyverse/irods-rule-async-exec-cmd/turnin"
 	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
 	amqp_mod "github.com/streadway/amqp"
@@ -208,8 +208,8 @@ func (amqp *AMQP) Release() {
 	amqp.eventHandler = nil
 }
 
-// ProcessItem processes a drop-in send_message request, publishing a AMQP message
-func (amqp *AMQP) ProcessItem(item dropin.DropInItem) error {
+// ProcessItem processes a turn-in send_message request, publishing a AMQP message
+func (amqp *AMQP) ProcessItem(item turnin.TurnInItem) error {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "AMQP",
@@ -218,7 +218,7 @@ func (amqp *AMQP) ProcessItem(item dropin.DropInItem) error {
 
 	defer commons.StackTraceFromPanic(logger)
 
-	request, ok := item.(*dropin.SendMessageRequest)
+	request, ok := item.(*turnin.SendMessageRequest)
 	if !ok {
 		err := fmt.Errorf("failed to convert item to SendMessageRequest")
 		logger.Error(err)

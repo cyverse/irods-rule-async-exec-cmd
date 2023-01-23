@@ -10,7 +10,7 @@ import (
 
 	"github.com/antchfx/xmlquery"
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
-	"github.com/cyverse/irods-rule-async-exec-cmd/dropin"
+	"github.com/cyverse/irods-rule-async-exec-cmd/turnin"
 	log "github.com/sirupsen/logrus"
 	amqp_mod "github.com/streadway/amqp"
 )
@@ -69,7 +69,7 @@ func (bisque *BisQue) Release() {
 	}
 }
 
-// ProcessItem processes a drop-in request
+// ProcessItem processes a turn-in request
 func (bisque *BisQue) HandleAmqpEvent(msg amqp_mod.Delivery) {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
@@ -123,6 +123,13 @@ func (bisque *BisQue) processAmqpAddMessage(msg amqp_mod.Delivery) {
 		return
 	}
 
+	if user == bisque.config.IrodsUsername {
+		// raised by irods user via bisque interface
+		// we don't need to re-process as it's already processed by bisque.
+		logger.Debug("ignoring the request since the request is made by BisQue")
+		return
+	}
+
 	path, err := GetIrodsMsgPath(msgStruct)
 	if err != nil {
 		logger.Error(err)
@@ -137,12 +144,12 @@ func (bisque *BisQue) processAmqpAddMessage(msg amqp_mod.Delivery) {
 
 	bisqueUser := bisque.getHomeUser(path, user)
 
-	logger.Debugf("drop a link bisque request %s, %s", bisqueUser, path)
+	logger.Debugf("turn-in a link bisque request %s, %s", bisqueUser, path)
 
-	request := dropin.NewLinkBisqueRequest(bisqueUser, path)
-	err = bisque.service.dropin.Drop(request)
+	request := turnin.NewLinkBisqueRequest(bisqueUser, path)
+	err = bisque.service.turnin.Turnin(request)
 	if err != nil {
-		logger.WithError(err).Errorf("failed to drop a link bisque request - %s, %s", bisqueUser, path)
+		logger.WithError(err).Errorf("failed to turn-in a link bisque request - %s, %s", bisqueUser, path)
 		return
 	}
 }
@@ -170,6 +177,13 @@ func (bisque *BisQue) processAmqpMoveMessage(msg amqp_mod.Delivery) {
 		return
 	}
 
+	if user == bisque.config.IrodsUsername {
+		// raised by irods user via BisQue interface
+		// we don't need to re-process as it's already processed by BisQue.
+		logger.Debug("ignoring the request since the request is made by BisQue")
+		return
+	}
+
 	oldPath, newPath, err := GetIrodsMsgOldNewPath(msgStruct)
 	if err != nil {
 		logger.Error(err)
@@ -181,12 +195,12 @@ func (bisque *BisQue) processAmqpMoveMessage(msg amqp_mod.Delivery) {
 			// move
 			bisqueUser := bisque.getHomeUser(newPath, user)
 
-			logger.Debugf("drop a move bisque request %s, %s to %s", bisqueUser, oldPath, newPath)
+			logger.Debugf("turn-in a move bisque request %s, %s to %s", bisqueUser, oldPath, newPath)
 
-			request := dropin.NewMoveBisqueRequest(bisqueUser, oldPath, newPath)
-			err = bisque.service.dropin.Drop(request)
+			request := turnin.NewMoveBisqueRequest(bisqueUser, oldPath, newPath)
+			err = bisque.service.turnin.Turnin(request)
 			if err != nil {
-				logger.WithError(err).Errorf("failed to drop a move bisque request - %s, %s, %s", bisqueUser, oldPath, newPath)
+				logger.WithError(err).Errorf("failed to turn-in a move bisque request - %s, %s, %s", bisqueUser, oldPath, newPath)
 				return
 			}
 			return
@@ -194,12 +208,12 @@ func (bisque *BisQue) processAmqpMoveMessage(msg amqp_mod.Delivery) {
 			// remove
 			bisqueUser := bisque.getHomeUser(oldPath, user)
 
-			logger.Debugf("drop a remove bisque request %s, %s", bisqueUser, oldPath)
+			logger.Debugf("turn-in a remove bisque request %s, %s", bisqueUser, oldPath)
 
-			request := dropin.NewRemoveBisqueRequest(bisqueUser, oldPath)
-			err = bisque.service.dropin.Drop(request)
+			request := turnin.NewRemoveBisqueRequest(bisqueUser, oldPath)
+			err = bisque.service.turnin.Turnin(request)
 			if err != nil {
-				logger.WithError(err).Errorf("failed to drop a remove bisque request - %s, %s", bisqueUser, oldPath)
+				logger.WithError(err).Errorf("failed to turn-in a remove bisque request - %s, %s", bisqueUser, oldPath)
 				return
 			}
 			return
@@ -209,12 +223,12 @@ func (bisque *BisQue) processAmqpMoveMessage(msg amqp_mod.Delivery) {
 			// link
 			bisqueUser := bisque.getHomeUser(newPath, user)
 
-			logger.Debugf("drop a link bisque request %s, %s", bisqueUser, newPath)
+			logger.Debugf("turn-in a link bisque request %s, %s", bisqueUser, newPath)
 
-			request := dropin.NewLinkBisqueRequest(bisqueUser, newPath)
-			err = bisque.service.dropin.Drop(request)
+			request := turnin.NewLinkBisqueRequest(bisqueUser, newPath)
+			err = bisque.service.turnin.Turnin(request)
 			if err != nil {
-				logger.WithError(err).Errorf("failed to drop a link bisque request - %s, %s", bisqueUser, newPath)
+				logger.WithError(err).Errorf("failed to turn-in a link bisque request - %s, %s", bisqueUser, newPath)
 				return
 			}
 			return
@@ -249,6 +263,13 @@ func (bisque *BisQue) processAmqpRemoveMessage(msg amqp_mod.Delivery) {
 		return
 	}
 
+	if user == bisque.config.IrodsUsername {
+		// raised by irods user via bisque interface
+		// we don't need to re-process as it's already processed by bisque.
+		logger.Debug("ignoring the request since the request is made by BisQue")
+		return
+	}
+
 	path, err := GetIrodsMsgPath(msgStruct)
 	if err != nil {
 		logger.Error(err)
@@ -257,18 +278,18 @@ func (bisque *BisQue) processAmqpRemoveMessage(msg amqp_mod.Delivery) {
 
 	bisqueUser := bisque.getHomeUser(path, user)
 
-	logger.Debugf("drop a remove bisque request %s, %s", bisqueUser, path)
+	logger.Debugf("turn-in a remove bisque request %s, %s", bisqueUser, path)
 
-	request := dropin.NewRemoveBisqueRequest(bisqueUser, path)
-	err = bisque.service.dropin.Drop(request)
+	request := turnin.NewRemoveBisqueRequest(bisqueUser, path)
+	err = bisque.service.turnin.Turnin(request)
 	if err != nil {
-		logger.WithError(err).Errorf("failed to drop a remove bisque request - %s, %s", bisqueUser, path)
+		logger.WithError(err).Errorf("failed to turn-in a remove bisque request - %s, %s", bisqueUser, path)
 		return
 	}
 }
 
-// ProcessItem processes a drop-in request
-func (bisque *BisQue) ProcessItem(item dropin.DropInItem) error {
+// ProcessItem processes a turn-in request
+func (bisque *BisQue) ProcessItem(item turnin.TurnInItem) error {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "BisQue",
@@ -276,24 +297,24 @@ func (bisque *BisQue) ProcessItem(item dropin.DropInItem) error {
 	})
 
 	switch item.GetRequestType() {
-	case dropin.LinkBisqueRequestType:
-		request, ok := item.(*dropin.LinkBisqueRequest)
+	case turnin.LinkBisqueRequestType:
+		request, ok := item.(*turnin.LinkBisqueRequest)
 		if !ok {
 			err := fmt.Errorf("failed to convert item to LinkBisqueRequest")
 			logger.Error(err)
 			return err
 		}
 		return bisque.ProcessLinkBisqueRequest(request)
-	case dropin.RemoveBisqueRequestType:
-		request, ok := item.(*dropin.RemoveBisqueRequest)
+	case turnin.RemoveBisqueRequestType:
+		request, ok := item.(*turnin.RemoveBisqueRequest)
 		if !ok {
 			err := fmt.Errorf("failed to convert item to RemoveBisqueRequest")
 			logger.Error(err)
 			return err
 		}
 		return bisque.ProcessRemoveBisqueRequest(request)
-	case dropin.MoveBisqueRequestType:
-		request, ok := item.(*dropin.MoveBisqueRequest)
+	case turnin.MoveBisqueRequestType:
+		request, ok := item.(*turnin.MoveBisqueRequest)
 		if !ok {
 			err := fmt.Errorf("failed to convert item to MoveBisqueRequest")
 			logger.Error(err)
@@ -307,8 +328,8 @@ func (bisque *BisQue) ProcessItem(item dropin.DropInItem) error {
 	}
 }
 
-// ProcessLinkBisqueRequest processes a drop-in link_bisque request, sending a HTTP request
-func (bisque *BisQue) ProcessLinkBisqueRequest(request *dropin.LinkBisqueRequest) error {
+// ProcessLinkBisqueRequest processes a turn-in link_bisque request, sending a HTTP request
+func (bisque *BisQue) ProcessLinkBisqueRequest(request *turnin.LinkBisqueRequest) error {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "BisQue",
@@ -401,8 +422,8 @@ func (bisque *BisQue) ProcessLinkBisqueRequest(request *dropin.LinkBisqueRequest
 	return nil
 }
 
-// ProcessRemoveBisqueRequest processes a drop-in remove_bisque request, sending a HTTP request
-func (bisque *BisQue) ProcessRemoveBisqueRequest(request *dropin.RemoveBisqueRequest) error {
+// ProcessRemoveBisqueRequest processes a turn-in remove_bisque request, sending a HTTP request
+func (bisque *BisQue) ProcessRemoveBisqueRequest(request *turnin.RemoveBisqueRequest) error {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "BisQue",
@@ -442,8 +463,8 @@ func (bisque *BisQue) ProcessRemoveBisqueRequest(request *dropin.RemoveBisqueReq
 	return nil
 }
 
-// ProcessMoveBisqueRequest processes a drop-in move_bisque request, sending a HTTP request
-func (bisque *BisQue) ProcessMoveBisqueRequest(request *dropin.MoveBisqueRequest) error {
+// ProcessMoveBisqueRequest processes a turn-in move_bisque request, sending a HTTP request
+func (bisque *BisQue) ProcessMoveBisqueRequest(request *turnin.MoveBisqueRequest) error {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "BisQue",

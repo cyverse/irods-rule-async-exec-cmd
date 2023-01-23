@@ -7,7 +7,7 @@ import (
 
 	cmd_commons "github.com/cyverse/irods-rule-async-exec-cmd/client-cmd/commons"
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
-	"github.com/cyverse/irods-rule-async-exec-cmd/dropin"
+	"github.com/cyverse/irods-rule-async-exec-cmd/turnin"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -16,7 +16,7 @@ var moveBisqueCmd = &cobra.Command{
 	Use:   "move_bisque [iRODS username] [iRODS source file path] [iRODS dest file path]",
 	Short: "Move an iRODS file in BisQue",
 	Long: `This buffers a request to be sent to BisQue for moving an iRODS file.
-	The message is stored in the drop in dir temporarily, then processed by the service.`,
+	The message is stored in the turn-in dir temporarily, then processed by the service.`,
 	RunE: processMoveBisqueCommand,
 }
 
@@ -53,7 +53,7 @@ func processMoveBisqueCommand(command *cobra.Command, args []string) error {
 		irodsUsername := args[0]
 		irodsSrcPath := args[1]
 		irodsDestPath := args[2]
-		err = dropMoveBisqueRequestOne(config, irodsUsername, irodsSrcPath, irodsDestPath)
+		err = turninMoveBisqueRequestOne(config, irodsUsername, irodsSrcPath, irodsDestPath)
 		if err != nil {
 			logger.Error(err)
 			fmt.Fprintln(os.Stderr, err.Error())
@@ -68,18 +68,18 @@ func processMoveBisqueCommand(command *cobra.Command, args []string) error {
 	return nil
 }
 
-func dropMoveBisqueRequestOne(config *commons.ClientConfig, irodsUsername string, irodsSourcePath string, irodsDestPath string) error {
+func turninMoveBisqueRequestOne(config *commons.ClientConfig, irodsUsername string, irodsSourcePath string, irodsDestPath string) error {
 	logger := log.WithFields(log.Fields{
 		"package":  "subcmd",
-		"function": "dropMoveBisqueRequestOne",
+		"function": "turninMoveBisqueRequestOne",
 	})
 
-	di := dropin.NewDropIn(config.DropInDirPath)
+	ti := turnin.NewTurnIn(config.TurnInDirPath)
 
-	logger.Debugf("drop a move bisque request %s, %s to %s", irodsUsername, irodsSourcePath, irodsDestPath)
+	logger.Debugf("turn-in a move bisque request %s, %s to %s", irodsUsername, irodsSourcePath, irodsDestPath)
 
-	request := dropin.NewMoveBisqueRequest(irodsUsername, irodsSourcePath, irodsDestPath)
-	err := di.Drop(request)
+	request := turnin.NewMoveBisqueRequest(irodsUsername, irodsSourcePath, irodsDestPath)
+	err := ti.Turnin(request)
 	if err != nil {
 		logger.Error(err)
 		return err

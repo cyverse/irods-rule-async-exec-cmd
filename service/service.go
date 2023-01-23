@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/cyverse/irods-rule-async-exec-cmd/commons"
-	"github.com/cyverse/irods-rule-async-exec-cmd/dropin"
+	"github.com/cyverse/irods-rule-async-exec-cmd/turnin"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,7 +17,7 @@ const (
 // AsyncExecCmdService is a service object
 type AsyncExecCmdService struct {
 	config *commons.ServerConfig
-	dropin *dropin.DropIn
+	turnin *turnin.TurnIn
 
 	bisque *BisQue
 	amqp   *AMQP
@@ -38,7 +38,7 @@ func NewService(config *commons.ServerConfig) (*AsyncExecCmdService, error) {
 
 	service := &AsyncExecCmdService{
 		config: config,
-		dropin: dropin.NewDropIn(config.GetDropInRootDirPath()),
+		turnin: turnin.NewTurnIn(config.GetTurnInRootDirPath()),
 
 		terminateChan: make(chan bool),
 	}
@@ -72,7 +72,7 @@ func NewService(config *commons.ServerConfig) (*AsyncExecCmdService, error) {
 
 	service.amqp = amqp
 
-	err = service.dropin.MakeDropInDir()
+	err = service.turnin.MakeTurnInDir()
 	if err != nil {
 		logger.Error(err)
 		return nil, err
@@ -154,7 +154,7 @@ func (svc *AsyncExecCmdService) Stop() {
 	svc.terminateChan <- true
 }
 
-// Scrape scrape dropins
+// Scrape scrape turn-ins
 func (svc *AsyncExecCmdService) Scrape() {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
@@ -162,18 +162,18 @@ func (svc *AsyncExecCmdService) Scrape() {
 		"function": "Scrape",
 	})
 
-	logger.Debugf("checking drop-ins at %s", svc.config.GetDropInRootDirPath())
-	items, err := svc.dropin.Scrape()
+	logger.Debugf("checking turn-ins at %s", svc.config.GetTurnInRootDirPath())
+	items, err := svc.turnin.Scrape()
 	if err != nil {
 		logger.Error(err)
 		// continue
 	}
 
 	if len(items) > 0 {
-		logger.Debugf("found %d drop-ins at %s", len(items), svc.config.GetDropInRootDirPath())
+		logger.Debugf("found %d turn-ins at %s", len(items), svc.config.GetTurnInRootDirPath())
 
-		messageChan := make(chan dropin.DropInItem)
-		bisqueChan := make(chan dropin.DropInItem)
+		messageChan := make(chan turnin.TurnInItem)
+		bisqueChan := make(chan turnin.TurnInItem)
 
 		wg := sync.WaitGroup{}
 		wg.Add(2)
@@ -202,14 +202,14 @@ func (svc *AsyncExecCmdService) Scrape() {
 		}()
 
 		for _, item := range items {
-			if dropin.IsItemTypeSendMessage(item) {
-				logger.Debug("sending a drop-in to send_message queue")
+			if turnin.IsItemTypeSendMessage(item) {
+				logger.Debug("sending a turn-in to send_message queue")
 				messageChan <- item
-			} else if dropin.IsItemTypeBisque(item) {
-				logger.Debug("sending a drop-in to bisque queue")
+			} else if turnin.IsItemTypeBisque(item) {
+				logger.Debug("sending a turn-in to bisque queue")
 				bisqueChan <- item
 			} else {
-				logger.Debug("unknown drop-in found, skip")
+				logger.Debug("unknown turn-in found, skip")
 			}
 		}
 
@@ -220,34 +220,34 @@ func (svc *AsyncExecCmdService) Scrape() {
 	}
 }
 
-func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) bool {
+func (svc *AsyncExecCmdService) ProcessItem(item turnin.TurnInItem) bool {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "AsyncExecCmdService",
 		"function": "ProcessItem",
 	})
 
-	logger.Debug("Processing a drop-in item")
+	logger.Debug("Processing a turn-in item")
 	err := svc.distributeItem(item)
 	if err != nil {
 		if IsServiceNotReadyError(err) {
-			logger.WithError(err).Errorf("service is not ready. will retry next time. pending drop-in %s", item.GetRequestType())
+			logger.WithError(err).Errorf("service is not ready. will retry next time. pending turn-in %s", item.GetRequestType())
 			// do not mark failed
 			// will retry at next iteration
-			// drop all items
+			// stop
 			return false
 		} else {
-			logger.WithError(err).Errorf("failed to process drop-in %s", item.GetRequestType())
-			svc.dropin.MarkFailed(item)
+			logger.WithError(err).Errorf("failed to process an item turned-in %s", item.GetRequestType())
+			svc.turnin.MarkFailed(item)
 		}
 	} else {
-		logger.Debugf("Processed a drop-in item")
+		logger.Debugf("Processed an item turned-in")
 
 		if len(item.GetItemFilePath()) > 0 {
 			// processed -> delete file
-			err = svc.dropin.MarkSuccess(item)
+			err = svc.turnin.MarkSuccess(item)
 			if err != nil {
-				logger.WithError(err).Errorf("failed to mark drop-in %s success", item.GetRequestType())
+				logger.WithError(err).Errorf("failed to mark an item turned-in %s success", item.GetRequestType())
 			}
 		}
 	}
@@ -255,7 +255,7 @@ func (svc *AsyncExecCmdService) ProcessItem(item dropin.DropInItem) bool {
 	return true
 }
 
-func (svc *AsyncExecCmdService) distributeItem(item dropin.DropInItem) error {
+func (svc *AsyncExecCmdService) distributeItem(item turnin.TurnInItem) error {
 	logger := log.WithFields(log.Fields{
 		"package":  "service",
 		"struct":   "AsyncExecCmdService",
@@ -263,7 +263,7 @@ func (svc *AsyncExecCmdService) distributeItem(item dropin.DropInItem) error {
 	})
 
 	switch item.GetRequestType() {
-	case dropin.SendMessageRequestType:
+	case turnin.SendMessageRequestType:
 		processed := false
 		if svc.amqp != nil {
 			logger.Debug("Sending an AMQP request")
@@ -279,7 +279,7 @@ func (svc *AsyncExecCmdService) distributeItem(item dropin.DropInItem) error {
 		if !processed {
 			return fmt.Errorf("failed to send a send_message request because AMQP is not configured")
 		}
-	case dropin.LinkBisqueRequestType, dropin.RemoveBisqueRequestType, dropin.MoveBisqueRequestType:
+	case turnin.LinkBisqueRequestType, turnin.RemoveBisqueRequestType, turnin.MoveBisqueRequestType:
 		processed := false
 		if svc.bisque != nil {
 			logger.Debug("Sending a BisQue request")

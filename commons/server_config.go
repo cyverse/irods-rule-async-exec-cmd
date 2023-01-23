@@ -30,6 +30,7 @@ type BisqueConfig struct {
 	URL           string `yaml:"url"`
 	AdminUsername string `yaml:"admin_username"`
 	AdminPassword string `yaml:"admin_password"`
+	IrodsUsername string `yaml:"irods_username"` // username that will write/read on behalf of all other users in BisQue (user who mounts irods)
 	IrodsZone     string `yaml:"irods_zone"`
 	IrodsBaseURL  string `yaml:"irods_base_url"`  // include http:// or file://
 	IrodsRootPath string `yaml:"irods_root_path"` // e.g., '/ucsb/home' for ucsb
@@ -90,6 +91,7 @@ func NewDefaultServerConfig() *ServerConfig {
 			URL:           "",
 			AdminUsername: "",
 			AdminPassword: "",
+			IrodsUsername: "",
 			IrodsZone:     "",
 			IrodsRootPath: IrodsRootPathDefault,
 		},
@@ -132,8 +134,8 @@ func (config *ServerConfig) GetLogFilePath() string {
 	return path.Join(config.DataRootPath, getLogFilename())
 }
 
-func (config *ServerConfig) GetDropInRootDirPath() string {
-	return path.Join(config.DataRootPath, "dropin")
+func (config *ServerConfig) GetTurnInRootDirPath() string {
+	return path.Join(config.DataRootPath, "turnin")
 }
 
 // MakeLogDir makes a log dir required
@@ -150,8 +152,8 @@ func (config *ServerConfig) MakeLogDir() error {
 
 // MakeWorkDirs makes dirs required
 func (config *ServerConfig) MakeWorkDirs() error {
-	dropinDirPath := config.GetDropInRootDirPath()
-	err := config.makeDir(dropinDirPath)
+	turninDirPath := config.GetTurnInRootDirPath()
+	err := config.makeDir(turninDirPath)
 	if err != nil {
 		return err
 	}
@@ -218,6 +220,10 @@ func (config *ServerConfig) Validate() error {
 
 		if len(config.BisqueConfig.AdminPassword) == 0 {
 			return errors.New("BisQue Admin Password is not given")
+		}
+
+		if len(config.BisqueConfig.IrodsUsername) == 0 {
+			return errors.New("BisQue iRODS Username is not given")
 		}
 
 		if len(config.BisqueConfig.IrodsZone) == 0 {
