@@ -162,7 +162,8 @@ func (svc *AsyncExecCmdService) Scrape() {
 		"function": "Scrape",
 	})
 
-	logger.Debugf("checking turn-ins at %s", svc.config.GetTurnInRootDirPath())
+	// do not uncomment this for release
+	//logger.Debugf("checking turn-ins at %s", svc.config.GetTurnInRootDirPath())
 	items, err := svc.turnin.Scrape()
 	if err != nil {
 		logger.Error(err)
