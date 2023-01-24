@@ -195,15 +195,39 @@ func (bisque *BisQue) processAmqpMoveMessage(msg amqp_mod.Delivery) {
 			// move
 			bisqueUser := bisque.getHomeUser(newPath, user)
 
-			logger.Debugf("turn-in a move bisque request %s, %s to %s", bisqueUser, oldPath, newPath)
+			// instead of using move request, we use remove and link
+			// move request may not be designed to handle fs rename event
+			//
+			//	logger.Debugf("turn-in a move bisque request %s, %s to %s", bisqueUser, oldPath, newPath)
+			//
+			//	request := turnin.NewMoveBisqueRequest(bisqueUser, oldPath, newPath)
+			//	err = bisque.service.turnin.Turnin(request)
+			//	if err != nil {
+			//		logger.WithError(err).Errorf("failed to turn-in a move bisque request - %s, %s, %s", bisqueUser, oldPath, newPath)
+			//		return
+			//	}
 
-			request := turnin.NewMoveBisqueRequest(bisqueUser, oldPath, newPath)
-			err = bisque.service.turnin.Turnin(request)
+			// remove
+			logger.Debugf("turn-in a remove bisque request %s, %s", bisqueUser, oldPath)
+
+			requestRemove := turnin.NewRemoveBisqueRequest(bisqueUser, oldPath)
+			err = bisque.service.turnin.Turnin(requestRemove)
 			if err != nil {
-				logger.WithError(err).Errorf("failed to turn-in a move bisque request - %s, %s, %s", bisqueUser, oldPath, newPath)
+				logger.WithError(err).Errorf("failed to turn-in a remove bisque request - %s, %s", bisqueUser, oldPath)
+				return
+			}
+
+			// link
+			logger.Debugf("turn-in a link bisque request %s, %s", bisqueUser, newPath)
+
+			requestLink := turnin.NewLinkBisqueRequest(bisqueUser, newPath)
+			err = bisque.service.turnin.Turnin(requestLink)
+			if err != nil {
+				logger.WithError(err).Errorf("failed to turn-in a link bisque request - %s, %s", bisqueUser, newPath)
 				return
 			}
 			return
+
 		} else {
 			// remove
 			bisqueUser := bisque.getHomeUser(oldPath, user)
@@ -338,6 +362,23 @@ func (bisque *BisQue) ProcessLinkBisqueRequest(request *turnin.LinkBisqueRequest
 
 	defer commons.StackTraceFromPanic(logger)
 
+	removeRequest := turnin.NewRemoveBisqueRequest(request.IRODSUsername, request.IRODSPath)
+	// ignore error as it may fail if there's no file existing
+	bisque.processRemoveBisqueRequest(removeRequest)
+
+	return bisque.processLinkBisqueRequest(request)
+}
+
+// processLinkBisqueRequest processes a turn-in link_bisque request, sending a HTTP request
+func (bisque *BisQue) processLinkBisqueRequest(request *turnin.LinkBisqueRequest) error {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "processLinkBisqueRequest",
+	})
+
+	defer commons.StackTraceFromPanic(logger)
+
 	logger.Debugf("trying to send a HTTP request for linking an iRODS object %s", request.IRODSPath)
 
 	if len(request.IRODSPath) == 0 || len(request.IRODSUsername) == 0 {
@@ -432,6 +473,19 @@ func (bisque *BisQue) ProcessRemoveBisqueRequest(request *turnin.RemoveBisqueReq
 
 	defer commons.StackTraceFromPanic(logger)
 
+	return bisque.processRemoveBisqueRequest(request)
+}
+
+// processRemoveBisqueRequest processes a turn-in remove_bisque request, sending a HTTP request
+func (bisque *BisQue) processRemoveBisqueRequest(request *turnin.RemoveBisqueRequest) error {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "processRemoveBisqueRequest",
+	})
+
+	defer commons.StackTraceFromPanic(logger)
+
 	logger.Debugf("trying to send a HTTP request for removing an iRODS object %s", request.IRODSPath)
 
 	if len(request.IRODSPath) == 0 || len(request.IRODSUsername) == 0 {
@@ -469,6 +523,19 @@ func (bisque *BisQue) ProcessMoveBisqueRequest(request *turnin.MoveBisqueRequest
 		"package":  "service",
 		"struct":   "BisQue",
 		"function": "ProcessMoveBisqueRequest",
+	})
+
+	defer commons.StackTraceFromPanic(logger)
+
+	return bisque.processMoveBisqueRequest(request)
+}
+
+// processMoveBisqueRequest processes a turn-in move_bisque request, sending a HTTP request
+func (bisque *BisQue) processMoveBisqueRequest(request *turnin.MoveBisqueRequest) error {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "processMoveBisqueRequest",
 	})
 
 	defer commons.StackTraceFromPanic(logger)
