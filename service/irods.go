@@ -168,3 +168,38 @@ func (irods *IRODS) SetKeyVal(irodsPath string, key string, val string) error {
 	logger.Infof("set a key/val to an iRODS collection/data-object %s, key: %s", irodsPath, key)
 	return nil
 }
+
+// ResolveObjectUUIDIntoPath resolves object uuid into path
+func (irods *IRODS) ResolveObjectUUIDIntoPath(uuid string) (string, error) {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "IRODS",
+		"function": "ResolveObjectUUIDIntoPath",
+	})
+
+	defer commons.StackTraceFromPanic(logger)
+
+	err := irods.ensureConnected()
+	if err != nil {
+		logger.Error(err)
+		return "", err
+	}
+
+	irods.connectionLock.Lock()
+	defer irods.connectionLock.Unlock()
+
+	logger.Debugf("trying to resolve UUID %s", uuid)
+
+	entries, err := irods.fsClient.SearchByMeta("ipc_UUID", uuid)
+	if err == nil {
+		// only one entry must be found
+		if len(entries) == 1 {
+			// return full path of the data object or the collection
+			logger.Debugf("found a data-object %s for uuid %s", entries[0].Path, uuid)
+			return entries[0].Path, nil
+		}
+	}
+
+	// if we couldn't find, return empty string
+	return "", nil
+}

@@ -52,6 +52,16 @@ func GetIrodsMsgPath(msg map[string]interface{}) (string, error) {
 	return path, nil
 }
 
+// GetIrodsMsgUUID returns IRODS uuid
+func GetIrodsMsgUUID(msg map[string]interface{}) (string, error) {
+	path, ok := msg["entity"].(string)
+	if !ok {
+		return "", fmt.Errorf("failed to get uuid string field from the message")
+	}
+
+	return path, nil
+}
+
 // GetIrodsMsgOldNewPath returns IRODS old path and IRODS new path
 func GetIrodsMsgOldNewPath(msg map[string]interface{}) (string, string, error) {
 	oldPath, ok1 := msg["old-path"].(string)

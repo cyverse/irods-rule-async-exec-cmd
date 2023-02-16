@@ -296,9 +296,17 @@ func (bisque *BisQue) processAmqpModifyMessage(msg amqp_mod.Delivery) {
 		return
 	}
 
-	path, err := GetIrodsMsgPath(msgStruct)
+	// you cannot get path directory from data-object.mod message
+	// it only has entity (uuid of the object)
+	objUuid, err := GetIrodsMsgUUID(msgStruct)
 	if err != nil {
 		logger.Error(err)
+		return
+	}
+
+	path, err := bisque.service.irods.ResolveObjectUUIDIntoPath(objUuid)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to resolve iRODS object UUID into path - %s", objUuid)
 		return
 	}
 
