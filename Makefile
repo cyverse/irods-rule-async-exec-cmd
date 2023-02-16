@@ -1,5 +1,5 @@
 PKG=github.com/cyverse/irods-rule-async-exec-cmd
-VERSION=v0.2.11
+VERSION=v0.2.12
 GIT_COMMIT?=$(shell git rev-parse HEAD)
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS?="-X '${PKG}/commons.releaseVersion=${VERSION}' -X '${PKG}/commons.gitCommit=${GIT_COMMIT}' -X '${PKG}/commons.buildDate=${BUILD_DATE}'"
