@@ -91,6 +91,8 @@ func (bisque *BisQue) HandleAmqpEvent(msg amqp_mod.Delivery) {
 	case "data-object.mv":
 		bisque.processAmqpMoveMessage(msg)
 		return
+	case "data-object.mod":
+		bisque.processAmqpModifyMessage(msg)
 	case "data-object.rm":
 		bisque.processAmqpRemoveMessage(msg)
 		return
@@ -261,6 +263,73 @@ func (bisque *BisQue) processAmqpMoveMessage(msg amqp_mod.Delivery) {
 			logger.Debugf("ignoring the request since the iRODS path %s and %s are out of iRODS root path %s", oldPath, newPath, bisque.config.IrodsRootPath)
 			return
 		}
+	}
+}
+
+func (bisque *BisQue) processAmqpModifyMessage(msg amqp_mod.Delivery) {
+	logger := log.WithFields(log.Fields{
+		"package":  "service",
+		"struct":   "BisQue",
+		"function": "processAmqpModifyMessage",
+	})
+
+	defer commons.StackTraceFromPanic(logger)
+
+	logger.Debugf("received a message - %s", string(msg.Body))
+
+	msgStruct, err := GetIrodsMsgFromJson(msg.Body)
+	if err != nil {
+		logger.Error(err)
+		return
+	}
+
+	user, _, err := GetIrodsMsgUserZone(msgStruct)
+	if err != nil {
+		logger.Error(err)
+		return
+	}
+
+	if user == bisque.config.IrodsUsername {
+		// raised by irods user via BisQue interface
+		// we don't need to re-process as it's already processed by BisQue.
+		logger.Debug("ignoring the request since the request is made by BisQue")
+		return
+	}
+
+	path, err := GetIrodsMsgPath(msgStruct)
+	if err != nil {
+		logger.Error(err)
+		return
+	}
+
+	if !bisque.isIrodsPathForBisque(path) {
+		// ignore
+		logger.Debugf("ignoring the request since the iRODS path %s is out of BisQue's iRODS root path %s", path, bisque.config.IrodsRootPath)
+		return
+	}
+
+	bisqueUser := bisque.getHomeUser(path, user)
+
+	// because bisque caches content, we need to remove and link to flush caches
+
+	// remove
+	logger.Debugf("turn-in a remove bisque request %s, %s", bisqueUser, path)
+
+	requestRemove := turnin.NewRemoveBisqueRequest(bisqueUser, path)
+	err = bisque.service.turnin.Turnin(requestRemove)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to turn-in a remove bisque request - %s, %s", bisqueUser, path)
+		return
+	}
+
+	// link
+	logger.Debugf("turn-in a link bisque request %s, %s", bisqueUser, path)
+
+	requestLink := turnin.NewLinkBisqueRequest(bisqueUser, path)
+	err = bisque.service.turnin.Turnin(requestLink)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to turn-in a link bisque request - %s, %s", bisqueUser, path)
+		return
 	}
 }
 
