@@ -87,15 +87,12 @@ func (bisque *BisQue) HandleAmqpEvent(msg amqp_mod.Delivery) {
 	switch msg.RoutingKey {
 	case "data-object.add":
 		bisque.processAmqpAddMessage(msg)
-		return
 	case "data-object.mv":
 		bisque.processAmqpMoveMessage(msg)
-		return
 	case "data-object.mod":
 		bisque.processAmqpModifyMessage(msg)
 	case "data-object.rm":
 		bisque.processAmqpRemoveMessage(msg)
-		return
 	default:
 		// event is not interested
 		return
@@ -229,7 +226,6 @@ func (bisque *BisQue) processAmqpMoveMessage(msg amqp_mod.Delivery) {
 				return
 			}
 			return
-
 		} else {
 			// remove
 			bisqueUser := bisque.getHomeUser(oldPath, user)
@@ -318,19 +314,7 @@ func (bisque *BisQue) processAmqpModifyMessage(msg amqp_mod.Delivery) {
 
 	bisqueUser := bisque.getHomeUser(path, user)
 
-	// because bisque caches content, we need to remove and link to flush caches
-
-	// remove
-	logger.Debugf("turn-in a remove bisque request %s, %s", bisqueUser, path)
-
-	requestRemove := turnin.NewRemoveBisqueRequest(bisqueUser, path)
-	err = bisque.service.turnin.Turnin(requestRemove)
-	if err != nil {
-		logger.WithError(err).Errorf("failed to turn-in a remove bisque request - %s, %s", bisqueUser, path)
-		return
-	}
-
-	// link
+	// link (this updates the existing link as well)
 	logger.Debugf("turn-in a link bisque request %s, %s", bisqueUser, path)
 
 	requestLink := turnin.NewLinkBisqueRequest(bisqueUser, path)
@@ -439,10 +423,6 @@ func (bisque *BisQue) ProcessLinkBisqueRequest(request *turnin.LinkBisqueRequest
 
 	defer commons.StackTraceFromPanic(logger)
 
-	removeRequest := turnin.NewRemoveBisqueRequest(request.IRODSUsername, request.IRODSPath)
-	// ignore error as it may fail if there's no file existing
-	bisque.processRemoveBisqueRequest(removeRequest)
-
 	return bisque.processLinkBisqueRequest(request)
 }
 
@@ -464,9 +444,33 @@ func (bisque *BisQue) processLinkBisqueRequest(request *turnin.LinkBisqueRequest
 		return err
 	}
 
-	bisqueUrl := bisque.getApiUrl("/blob_service/paths/insert")
+	irodsPathFromBisque, err := bisque.getIrodsPath(request.IRODSPath)
+	if err != nil {
+		logger.WithError(err).Errorf("failed to get iRODS URL for linking an iRODS object %s", request.IRODSPath)
+		return err
+	}
 
-	params := map[string]string{
+	// we first remove the resource to not create duplicates
+	bisqueUrlForRemove := bisque.getApiUrl("/blob_service/paths/remove")
+
+	paramsForRemove := map[string]string{
+		"path":        irodsPathFromBisque,
+		"delete_blob": "False",
+	}
+
+	_, err = bisque.get(bisqueUrlForRemove, paramsForRemove)
+	if err != nil {
+		logger.WithError(err).Warnf("failed to send a HTTP request for removing an iRODS object %s, the object may not exist", request.IRODSPath)
+		// we continue
+		//return err
+	}
+
+	logger.Infof("published a HTTP request for removing an iRODS object %s", request.IRODSPath)
+
+	// insert now
+	bisqueUrlForLink := bisque.getApiUrl("/blob_service/paths/insert")
+
+	paramsForLink := map[string]string{
 		"user": request.IRODSUsername,
 	}
 
@@ -476,15 +480,9 @@ func (bisque *BisQue) processLinkBisqueRequest(request *turnin.LinkBisqueRequest
 		return err
 	}
 
-	irodsPathFromBisque, err := bisque.getIrodsPath(request.IRODSPath)
-	if err != nil {
-		logger.WithError(err).Errorf("failed to get iRODS URL for linking an iRODS object %s", request.IRODSPath)
-		return err
-	}
-
 	body := fmt.Sprintf("<resource name=\"%s\" permission=\"%s\" value=\"%s\" />", resourceName, BisqueLinkPermissionDefault, irodsPathFromBisque)
 
-	resp, err := bisque.post(bisqueUrl, params, body)
+	resp, err := bisque.post(bisqueUrlForLink, paramsForLink, body)
 	if err != nil {
 		logger.WithError(err).Errorf("failed to send a HTTP request for linking an iRODS object %s to %s (%s in bisque)", request.IRODSPath, irodsPathFromBisque, resourceName)
 		return err
@@ -580,7 +578,8 @@ func (bisque *BisQue) processRemoveBisqueRequest(request *turnin.RemoveBisqueReq
 	}
 
 	params := map[string]string{
-		"path": irodsPathFromBisque,
+		"path":        irodsPathFromBisque,
+		"delete_blob": "False",
 	}
 
 	_, err = bisque.get(bisqueUrl, params)
